@@ -21,22 +21,30 @@ time_t duration;
 struct timespec wait_next_trans;
 struct sigaction sa;
 
+/*
+ * It handles the signal received from other processes
+ */
 void handle_sig(int);
+/*
+ * It reads the transaction received and store it
+ */
 void read_trans();
 
-int main(int argc, char* argv[]){
+int main(int argc, char *argv[])
+{
     double n;
-    
+
     sa.sa_handler = &handle_sig;
     sigaction(SIGCONT, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
-    
+
     wait_next_trans.tv_sec = 0;
-    
+
     load_file();
     nodes_sem = sem_open(SNAME_N, O_RDWR);
-    
-    while(1){
+
+    while (1)
+    {
         pause();
     }
     /*duration = time(NULL);
@@ -68,7 +76,8 @@ int main(int argc, char* argv[]){
     return 0;
 }
 
-void read_trans(){
+void read_trans()
+{
     sem_wait(nodes_sem);
     TEST_ERROR;
     trans_fd = open(TRANSACTION_FIFO, O_RDONLY);
@@ -80,8 +89,8 @@ void read_trans(){
     printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
     printf("    sent to: %d\n", my_transaction.receiver);
     printf("    sent by: %d", my_transaction.sender);
-    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                my_transaction.amount, my_transaction.reward);
+    printf("    transaction amount: %.2f\n    reward: %.2f\n",
+           my_transaction.amount, my_transaction.reward);
     printf("    sent to node: %d\n", getpid());
     printf("--------------------------------------------\n");
     sem_post(nodes_sem);
@@ -89,7 +98,8 @@ void read_trans(){
     nanosleep(&wait_next_trans, NULL);
 }
 
-void handle_sig(int signal){
+void handle_sig(int signal)
+{
     switch (signal)
     {
     case SIGCONT:
@@ -100,9 +110,8 @@ void handle_sig(int signal){
         kill(getppid(), SIGUSR1);
         sem_close(nodes_sem);
         exit(0);
-    break;
+        break;
     default:
         break;
     }
-    
 }

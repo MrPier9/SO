@@ -19,21 +19,32 @@ pid_t pid;
 struct sigaction sa;
 int user_done = 0;
 
+/*
+ * It makes and call user processes
+ */
 void make_users();
+
+/*
+ * It makes and call nodes processes
+ */
 void make_nodes();
+/*
+ * It handles the signal received from other processes
+ */
 void handle_sigint(int);
 
-int main(){
+int main()
+{
     /*int i;*/
-    
-    
+
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
-    
+
     mkfifo(TRANSACTION_FIFO, 0777);
     TEST_ERROR;
-    if(errno == 17){
+    if (errno == 17)
+    {
         exit(EXIT_FAILURE);
     }
     load_file();
@@ -45,7 +56,7 @@ int main(){
     nodes_sem_set(1);
     shm_user_set();
     shm_nodes_set();
-    
+
     printf("\n\nStarting simulation\n\n");
 
     make_nodes();
@@ -82,11 +93,12 @@ int main(){
     return 0;
 }
 
-void make_users(){
+void make_users()
+{
     int i;
     char *str_budget_init;
-    char * str_reward;
-    char * args_user[] = {USER_PATH, NULL, NULL, NULL};
+    char *str_reward;
+    char *args_user[] = {USER_PATH, NULL, NULL, NULL};
 
     str_budget_init = malloc(sizeof(int) * 10);
     str_reward = malloc(sizeof(int) * 3);
@@ -100,12 +112,16 @@ void make_users(){
     /*free(str_budget_init);
     free(str_reward);*/
 
-    for(i = 0; i < so_users_num; i++){
+    for (i = 0; i < so_users_num; i++)
+    {
         pid = fork();
-        if(pid < 0){
+        if (pid < 0)
+        {
             TEST_ERROR;
             exit(EXIT_FAILURE);
-        }else if(pid == 0){
+        }
+        else if (pid == 0)
+        {
             sem_wait(user_sem);
             puser_shm[i] = getpid();
             sem_post(user_sem);
@@ -113,19 +129,23 @@ void make_users(){
             TEST_ERROR;
         }
     }
-
 }
 
-void make_nodes(){
+void make_nodes()
+{
     int i;
     char *args_nodes[] = {NODES_PATH, NULL};
 
-    for(i = 0; i < so_nodes_num; i++){
+    for (i = 0; i < so_nodes_num; i++)
+    {
         pid = fork();
-        if(pid < 0){
+        if (pid < 0)
+        {
             TEST_ERROR;
             exit(EXIT_FAILURE);
-        }else if(pid == 0){
+        }
+        else if (pid == 0)
+        {
             pnodes_shm[i] = getpid();
             execve(NODES_PATH, args_nodes, NULL);
             TEST_ERROR
@@ -133,14 +153,18 @@ void make_nodes(){
     }
 }
 
-void handle_sigint(int signal){
+void handle_sigint(int signal)
+{
     int i;
-    switch (signal){
+    switch (signal)
+    {
     case SIGINT:
-        for(i = 0; i < so_users_num; i++){
-        kill(puser_shm[i], SIGINT);
+        for (i = 0; i < so_users_num; i++)
+        {
+            kill(puser_shm[i], SIGINT);
         }
-        for(i = 0; i < so_nodes_num; i++){
+        for (i = 0; i < so_nodes_num; i++)
+        {
             kill(pnodes_shm[i], SIGINT);
         }
         user_sem_del();
@@ -157,10 +181,12 @@ void handle_sigint(int signal){
         exit(0);
         break;
     case SIGUSR1:
-        for(i = 0; i < so_users_num; i++){
-        kill(puser_shm[i], SIGINT);
+        for (i = 0; i < so_users_num; i++)
+        {
+            kill(puser_shm[i], SIGINT);
         }
-        for(i = 0; i < so_nodes_num; i++){
+        for (i = 0; i < so_nodes_num; i++)
+        {
             kill(pnodes_shm[i], SIGINT);
         }
         user_sem_del();
@@ -179,16 +205,15 @@ void handle_sigint(int signal){
     case SIGUSR2:
         user_done++;
         printf("\n\n\nuser done: %d\n\n\n", user_done);
-        if(user_done == so_users_num){
-            for(i = 0; i < so_nodes_num; i++){
+        if (user_done == so_users_num)
+        {
+            for (i = 0; i < so_nodes_num; i++)
+            {
                 kill(pnodes_shm[i], SIGINT);
-             }
+            }
         }
         break;
     default:
         break;
     }
-    
 }
-
-

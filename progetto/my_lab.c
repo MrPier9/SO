@@ -16,9 +16,6 @@
 #include <limits.h>
 #include "my_lab.h"
 
-/*
- * It builds the semaphore for the user processes.
- */
 void user_sem_set(int sem_value)
 {
     user_sem = sem_open(SNAME, O_CREAT | O_EXCL, 0644, sem_value);
@@ -31,9 +28,6 @@ void user_sem_set(int sem_value)
     }
 }
 
-/*
- *It builds the semaphore for the nodes processes
- */
 void nodes_sem_set(int sem_value)
 {
     nodes_sem = sem_open(SNAME_N, O_CREAT | O_EXCL, 0644, sem_value);
@@ -44,27 +38,18 @@ void nodes_sem_set(int sem_value)
     }
 }
 
-/*
- * It unlink and then close user processes semaphore
- */
 void user_sem_del()
 {
     sem_unlink(SNAME);
     sem_close(user_sem);
 }
 
-/*
- * It unlink and then close nodes processes semaphore
- */
 void nodes_sem_del()
 {
     sem_unlink(SNAME_N);
     sem_close(nodes_sem);
 }
 
-/*
- * It sets the shared memory for the user processes
- */
 void shm_user_set()
 {
     users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, IPC_CREAT | 0666);
@@ -73,9 +58,6 @@ void shm_user_set()
     TEST_ERROR;
 }
 
-/*
- * It sets the shared memory for the nodes processes
- */
 void shm_nodes_set()
 {
     nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(int) * so_nodes_num, IPC_CREAT | 0666);
@@ -84,9 +66,6 @@ void shm_nodes_set()
     TEST_ERROR;
 }
 
-/*
- * It sets the timer for the next transaction creation
- */
 double set_wait()
 {
     srand(time(NULL));

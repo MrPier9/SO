@@ -15,8 +15,6 @@
 #include <limits.h>
 #include "my_lab.h"
 
-#define BILLION 1000000000L;
-
 int transaction_tot; /*cifra totale transazione*/
 float reward;        /*reward = x% del netto*/
 int budget;          /*netto transazione*/
@@ -50,6 +48,7 @@ int main(int argc, char *argv[])
         printf("Argument error\n");
         exit(EXIT_FAILURE);
     }
+    sleep(10);
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);

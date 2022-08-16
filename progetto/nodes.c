@@ -38,6 +38,8 @@ int main(int argc, char *argv[])
     sigaction(SIGCONT, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
 
+    sleep(10);
+
     wait_next_trans.tv_sec = 0;
 
     load_file();

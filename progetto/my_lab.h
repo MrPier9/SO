@@ -17,6 +17,7 @@
 #define USER_PATH "./users"
 #define NODES_PATH "./nodes"
 #define TRANSACTION_FIFO "trans_fifo"
+#define BILLION 1000000000L
 
 typedef struct
 {
@@ -55,15 +56,42 @@ int so_sim_sec;
 int so_num_friends;
 int so_hops;
 
-void user_sem_set(int); /*setta il semaforo con il valore che si necessita*/
+/*
+ * It builds the semaphore for the user processes.
+ */
+void user_sem_set(int);
+
+/*
+ *It builds the semaphore for the nodes processes
+ */
 void nodes_sem_set(int);
-void user_sem_del(); /*elimina il semaforo*/
+
+/*
+ * It unlink and then close user processes semaphore
+ */
+void user_sem_del();
+
+/*
+ * It unlink and then close nodes processes semaphore
+ */
 void nodes_sem_del();
 /*void safe_close(); chiama transaction_del e sem_del*/
 void load_file();      /*carica file con dati iniziali*/
 void test_load_file(); /*test file dati iniziali*/
+
+/*
+ * It sets the shared memory for the user processes
+ */
 void shm_user_set();
+
+/*
+ * It sets the shared memory for the nodes processes
+ */
 void shm_nodes_set();
+
+/*
+ * It sets the timer for the next transaction creation
+ */
 double set_wait();
 
 #endif

@@ -18,6 +18,8 @@
 pid_t pid;
 struct sigaction sa;
 int user_done = 0;
+int *user_arr;
+int *nodes_arr;
 
 /*
  * It makes and call user processes
@@ -35,7 +37,8 @@ void handle_sigint(int);
 
 int main()
 {
-    /*int i;*/
+    int i, duration;
+    struct timespec start, stop;
 
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
@@ -56,15 +59,46 @@ int main()
     nodes_sem_set(1);
     shm_user_set();
     shm_nodes_set();
+    user_arr = (int *)malloc(sizeof(int) * so_users_num);
+    nodes_arr = (int *)malloc(sizeof(int) * so_nodes_num);
 
+    clock_gettime(CLOCK_REALTIME, &start);
     printf("\n\nStarting simulation\n\n");
 
     make_nodes();
     make_users();
 
     /*TEST_ERROR;*/
+    sleep(1);
+    sem_wait(user_sem);
+    for (i = 0; i < so_users_num; i++)
+    {
+        user_arr[i] = puser_shm[i];
+    }
+    sem_post(user_sem);
 
-    sleep(so_sim_sec);
+    sem_wait(nodes_sem);
+    for (i = 0; i < so_nodes_num; i++)
+    {
+        nodes_arr[i] = pnodes_shm[i];
+    }
+    sem_post(nodes_sem);
+
+    do
+    {
+        for (i = 0; i < so_users_num; i++)
+        {
+            printf("working user %d with budget %d\n", user_arr[i], so_budget_init);
+        }
+        for (i = 0; i < so_nodes_num; i++)
+        {
+            printf("working nodes %d with budget %d\n", nodes_arr[i], so_budget_init);
+        }
+        printf("\n");
+        sleep(1);
+        clock_gettime(CLOCK_REALTIME, &stop);
+        duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
+    } while (duration < so_sim_sec);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire
         if(errno == ECHILD){
@@ -122,9 +156,9 @@ void make_users()
         }
         else if (pid == 0)
         {
-            sem_wait(user_sem);
+            /*sem_wait(user_sem);*/
             puser_shm[i] = getpid();
-            sem_post(user_sem);
+            /*sem_post(user_sem);*/
             execve(USER_PATH, args_user, NULL);
             TEST_ERROR;
         }

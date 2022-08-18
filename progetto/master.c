@@ -13,6 +13,7 @@
 #include <sys/shm.h>
 #include <sys/wait.h>
 #include <limits.h>
+#include <sys/msg.h>
 #include "my_lab.h"
 
 pid_t pid;
@@ -20,6 +21,7 @@ struct sigaction sa;
 int user_done = 0;
 int *user_arr;
 int *nodes_arr;
+int msg_id;
 
 /*
  * It makes and call user processes
@@ -44,12 +46,6 @@ int main()
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
 
-    mkfifo(TRANSACTION_FIFO, 0777);
-    TEST_ERROR;
-    if (errno == 17)
-    {
-        exit(EXIT_FAILURE);
-    }
     load_file();
     test_load_file();
     /*ser_sem_del();
@@ -59,6 +55,8 @@ int main()
     nodes_sem_set(1);
     shm_user_set();
     shm_nodes_set();
+    msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
+    TEST_ERROR;
     user_arr = (int *)malloc(sizeof(int) * so_users_num);
     nodes_arr = (int *)malloc(sizeof(int) * so_nodes_num);
 
@@ -69,7 +67,7 @@ int main()
     make_users();
 
     /*TEST_ERROR;*/
-    sleep(1);
+    sleep(3);
     sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++)
     {
@@ -84,10 +82,20 @@ int main()
     }
     sem_post(nodes_sem);
 
-    do
-    {
+
+    do{
         for (i = 0; i < so_users_num; i++)
         {
+            kill(user_arr[i], SIGSTOP);
+        }
+        for (i = 0; i < so_nodes_num; i++)
+        {
+            kill(nodes_arr[i], SIGSTOP);
+        }
+
+        for (i = 0; i < so_users_num; i++)
+        {
+            kill(user_arr[i], SIGSTOP);
             printf("working user %d with budget %d\n", user_arr[i], so_budget_init);
         }
         for (i = 0; i < so_nodes_num; i++)
@@ -95,9 +103,19 @@ int main()
             printf("working nodes %d with budget %d\n", nodes_arr[i], so_budget_init);
         }
         printf("\n");
+
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
+        printf("%d\n", duration);
+        for (i = 0; i < so_users_num; i++)
+        {
+            kill(user_arr[i], SIGCONT);
+        }
+        for (i = 0; i < so_nodes_num; i++)
+        {
+            kill(nodes_arr[i], SIGCONT);
+        }
     } while (duration < so_sim_sec);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire
@@ -120,15 +138,14 @@ int main()
     shmctl(users_shm_id, IPC_RMID, NULL);
     shmdt(pnodes_shm);
     shmctl(nodes_shm_id, IPC_RMID, NULL);
-    system("rm trans_fifo");
+    msgctl(msg_id, IPC_RMID, NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");
     sleep(1);
 
     return 0;
 }
 
-void make_users()
-{
+void make_users(){
     int i;
     char *str_budget_init;
     char *str_reward;
@@ -187,8 +204,7 @@ void make_nodes()
     }
 }
 
-void handle_sigint(int signal)
-{
+void handle_sigint(int signal){
     int i;
     switch (signal)
     {
@@ -207,7 +223,7 @@ void handle_sigint(int signal)
         shmctl(users_shm_id, IPC_RMID, NULL);
         shmdt(pnodes_shm);
         shmctl(nodes_shm_id, IPC_RMID, NULL);
-        system("rm trans_fifo");
+        msgctl(msg_id, IPC_RMID, NULL);
 
         printf("\n\n\nforced ending simulation...\n\n\n");
         sleep(1);
@@ -229,7 +245,7 @@ void handle_sigint(int signal)
         shmctl(users_shm_id, IPC_RMID, NULL);
         shmdt(pnodes_shm);
         shmctl(nodes_shm_id, IPC_RMID, NULL);
-        system("rm trans_fifo");
+        msgctl(msg_id, IPC_RMID, NULL);
 
         printf("\n\n\nending simulation due to node...\n\n\n");
         sleep(1);

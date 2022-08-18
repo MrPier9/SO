@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
+#include <sys/msg.h>
 #include <limits.h>
 #include "my_lab.h"
 
@@ -21,6 +22,8 @@ int budget;          /*netto transazione*/
 transaction my_transaction;
 int trans_fd;
 struct sigaction sa;
+int msg_id;
+int *list_nodes, *list_user, i;
 
 /*
  *It randomly calculate the value of the transaction
@@ -48,14 +51,18 @@ int main(int argc, char *argv[])
         printf("Argument error\n");
         exit(EXIT_FAILURE);
     }
-    sleep(10);
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
 
-    sleep(2);
+    sleep(1);
+
     load_file();
+    printf("file loaded\n");
+    TEST_ERROR;
     user_sem = sem_open(SNAME, O_RDWR); /*open semaphore created in master*/
+    TEST_ERROR;
+    printf("user sem set\n");
     budget = atoi(argv[1]);
     reward = atoi(argv[2]) * 0.01;
     users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
@@ -67,8 +74,32 @@ int main(int argc, char *argv[])
     TEST_ERROR;
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
     TEST_ERROR;
+    printf("shm set\n");
+
+    msg_id = msgget(MSG_QUEUE_KEY, 0666);
+    if(msg_id == -1){
+        fprintf(stderr,"msg queue error in user\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("msg set\n");
+    list_nodes = malloc(sizeof(int) * so_nodes_num);
+    list_user = malloc(sizeof(int) * so_users_num);
+    printf("pre semwait\n");
+    sem_wait(user_sem);
+    for(i = 0; i < so_users_num; i++){
+        list_user[i] = puser_shm[i];
+    }
+    for(i = 0; i < so_nodes_num; i++){
+        list_nodes[i] = pnodes_shm[i];
+    }
+    sem_post(user_sem);
+    shmdt(puser_shm);
+    shmdt(pnodes_shm);
+    printf("pid copied\n");
 
     wait_next_trans.tv_sec = 0;
+
+    printf("user ready %d\n", getpid());
 
     while (budget >= 2)
     {
@@ -83,7 +114,6 @@ int main(int argc, char *argv[])
         kill(getppid(), SIGUSR2);
     }
     sem_close(user_sem);
-    shmdt(puser_shm);
 
     return 0;
 }
@@ -110,24 +140,19 @@ int random_receiver()
 void transaction_data()
 {
     int n;
-
     struct timespec start, stop;
-    clock_gettime(CLOCK_REALTIME, &start);
-    TEST_ERROR;
 
-    sem_wait(user_sem);
-    TEST_ERROR;
+    clock_gettime(CLOCK_REALTIME, &start);
+
     /*printf("pid: %d - budget init= %d\n", getpid(), budget);*/
     transaction_tot = trans_val(budget);
     my_transaction.reward = transaction_tot * reward;
     my_transaction.amount = transaction_tot - my_transaction.reward;
     budget -= transaction_tot;
-    n = random_receiver();
-    while (n == getpid())
-    {
+    do {
         n = random_receiver();
-    }
-    my_transaction.receiver = puser_shm[n];
+    }while (n == getpid());
+    my_transaction.receiver = list_user[n];
 
     clock_gettime(CLOCK_REALTIME, &stop);
     TEST_ERROR;
@@ -138,20 +163,22 @@ void transaction_data()
     {
         printf("\nuser %d budget -> %d\n", getpid(), budget);
     }
-    trans_fd = open(TRANSACTION_FIFO, O_WRONLY);
+    /*trans_fd = open(TRANSACTION_FIFO, O_WRONLY);
     TEST_ERROR;
     write(trans_fd, &my_transaction, sizeof(my_transaction));
     TEST_ERROR;
-    close(trans_fd);
-
-    /*printf("    timestamp: %f", (double)my_transaction.timestamp);
+    close(trans_fd);*/
+    sem_wait(user_sem);
+    printf("    timestamp: %f", (double)my_transaction.timestamp);
     printf("    transaction sent: %d\n", transaction_tot);
     printf("    sent to: %d\n", my_transaction.receiver);
     printf("    transaction amount: %.2f\n    reward: %.2f\n", \
                 my_transaction.amount, my_transaction.reward);
     printf("    sent to node: %d\n  new budget: %d\n", \
                 pnodes_shm[rand() % so_nodes_num], budget);
-    printf("--------------------------------------------\n");*/
+    printf("--------------------------------------------\n");
+
+    msgsnd(msg_id, &my_transaction, sizeof(transaction), 0);
     sem_post(user_sem);
     TEST_ERROR;
 }

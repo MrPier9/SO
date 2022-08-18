@@ -12,6 +12,7 @@
 #include <signal.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
+#include <sys/msg.h>
 #include <limits.h>
 #include "my_lab.h"
 
@@ -20,6 +21,13 @@ int trans_fd;
 time_t duration;
 struct timespec wait_next_trans;
 struct sigaction sa;
+int msg_id;
+int *list_nodes, *list_user, i;
+
+typedef struct{
+    transaction *tp_len;
+    int len;
+} block;
 
 /*
  * It handles the signal received from other processes
@@ -33,23 +41,48 @@ void read_trans();
 int main(int argc, char *argv[])
 {
     double n;
+    block my_tp;
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGCONT, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
 
-    sleep(10);
-
     wait_next_trans.tv_sec = 0;
-
+    sleep(1);
     load_file();
+    my_tp.tp_len = (transaction *) malloc(sizeof(transaction) * so_tp_size);
+    msg_id = msgget(MSG_QUEUE_KEY, 0666);
+    TEST_ERROR;
+    users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
+    TEST_ERROR;
+    puser_shm = shmat(users_shm_id, NULL, 0);
+    TEST_ERROR;
+    nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(int) * so_nodes_num, 0666);
+    TEST_ERROR;
+    pnodes_shm = shmat(nodes_shm_id, NULL, 0);
+    TEST_ERROR;
+    user_sem = sem_open(SNAME, O_RDWR);
     nodes_sem = sem_open(SNAME_N, O_RDWR);
-
-    while (1)
-    {
-        pause();
+    users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
+    TEST_ERROR;
+    puser_shm = shmat(users_shm_id, NULL, 0);
+    TEST_ERROR;
+    sem_wait(user_sem);
+    for(i = 0; i < so_users_num; i++){
+        list_user[i] = puser_shm[i];
     }
-    /*duration = time(NULL);
+    for(i = 0; i < so_nodes_num; i++){
+        list_nodes[i] = pnodes_shm[i];
+    }
+    sem_post(user_sem);
+    shmdt(puser_shm);
+    shmdt(pnodes_shm);
+    /*while (1)
+    {
+        read_trans();
+    }
+
+    duration = time(NULL);
     while(time(NULL) < duration + 5){
         sleep(10);
         sem_wait(nodes_sem);
@@ -75,18 +108,15 @@ int main(int argc, char *argv[])
     close(trans_fd);
     kill(getppid(), SIGUSR1);
     sem_close(nodes_sem);
+    sem_close(user_sem);
+
     return 0;
 }
 
 void read_trans()
 {
-    sem_wait(nodes_sem);
+    msgrcv(msg_id, &my_transaction, sizeof(transaction), 0, 0);
     TEST_ERROR;
-    trans_fd = open(TRANSACTION_FIFO, O_RDONLY);
-    TEST_ERROR;
-    read(trans_fd, &my_transaction, sizeof(my_transaction));
-    TEST_ERROR;
-    close(trans_fd);
     printf("    timestamp: %f", (double)my_transaction.timestamp);
     printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
     printf("    sent to: %d\n", my_transaction.receiver);
@@ -105,12 +135,13 @@ void handle_sig(int signal)
     switch (signal)
     {
     case SIGCONT:
-        read_trans();
+        /*read_trans();*/
         break;
     case SIGINT:
         close(trans_fd);
         kill(getppid(), SIGUSR1);
         sem_close(nodes_sem);
+        sem_close(user_sem);
         exit(0);
         break;
     default:

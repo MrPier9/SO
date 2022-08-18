@@ -14,10 +14,12 @@
 #define SNAME_N "nodes_sem"
 #define SHM_NODES_KEY 7295
 #define SHM_USERS_KEY 7437
+#define MSG_QUEUE_KEY 7354
 #define USER_PATH "./users"
 #define NODES_PATH "./nodes"
 #define TRANSACTION_FIFO "trans_fifo"
 #define BILLION 1000000000L
+#define MAX 1024
 
 typedef struct
 {
@@ -27,6 +29,11 @@ typedef struct
     float amount;
     float reward;
 } transaction;
+
+struct message_buffer{
+    transaction msg_type;
+    char text[MAX];
+};
 
 transaction *transaction_value;
 

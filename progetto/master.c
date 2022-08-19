@@ -68,7 +68,7 @@ int main()
     make_users();
 
     /*TEST_ERROR;*/
-    sleep(3);
+    sleep(5);
     sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++)
     {
@@ -132,12 +132,21 @@ int main()
     for(i = 0; i < so_nodes_num; i++){
         printf("nodes pid n:%d - %d\n", i + 1, pnodes_shm[i]);
     }*/
+    for (i = 0; i < so_users_num; i++)
+    {
+        kill(user_arr[i], SIGINT);
+    }
+    for (i = 0; i < so_nodes_num; i++)
+    {
+        kill(nodes_arr[i], SIGINT);
+    }
+
 
     user_sem_del();
     nodes_sem_del();
-    shmdt(puser_shm);
+    /*shmdt(puser_shm);*/
     shmctl(users_shm_id, IPC_RMID, NULL);
-    shmdt(pnodes_shm);
+    /*shmdt(pnodes_shm);*/
     shmctl(nodes_shm_id, IPC_RMID, NULL);
     msgctl(msg_id, IPC_RMID, NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");

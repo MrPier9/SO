@@ -50,8 +50,7 @@ int main(int argc, char *argv[])
 {
     struct timespec wait_next_trans;
 
-    if (argc != 3)
-    {
+    if (argc != 3){
         printf("Argument error\n");
         exit(EXIT_FAILURE);
     }
@@ -98,7 +97,6 @@ int main(int argc, char *argv[])
 
     wait_next_trans.tv_sec = 0;
 
-    printf("user ready %d\n", getpid());
 
     while (budget >= 2)
     {
@@ -108,10 +106,10 @@ int main(int argc, char *argv[])
         nanosleep(&wait_next_trans, NULL);
     }
 
-    if (budget < 2)
+    /*if (budget < 2)
     {
         printf("\nuser %d budget -> %d, bout to send\n", getpid(), budget);
-    }
+    }*/
     sem_close(user_sem);
 
     return 0;

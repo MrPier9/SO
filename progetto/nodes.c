@@ -125,6 +125,7 @@ void read_trans()
 {
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
     TEST_ERROR;
+    my_transaction = transaction_rec.message;
     printf("    timestamp: %f", (double)my_transaction.timestamp);
     printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
     printf("    sent to: %d\n", my_transaction.receiver);

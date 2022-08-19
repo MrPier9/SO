@@ -111,7 +111,6 @@ int main(int argc, char *argv[])
     if (budget < 2)
     {
         printf("\nuser %d budget -> %d, bout to send\n", getpid(), budget);
-        kill(getppid(), SIGUSR2);
     }
     sem_close(user_sem);
 

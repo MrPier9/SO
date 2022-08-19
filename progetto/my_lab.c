@@ -19,13 +19,7 @@
 void user_sem_set(int sem_value)
 {
     user_sem = sem_open(SNAME, O_CREAT | O_EXCL, 0644, sem_value);
-    if (errno)
-    {
-        /*user_sem_del();
-        user_sem_set(sem_value);*/
-        TEST_ERROR;
-        /*exit(EXIT_FAILURE);*/
-    }
+    TEST_ERROR;
 }
 
 void nodes_sem_set(int sem_value)
@@ -42,12 +36,14 @@ void user_sem_del()
 {
     sem_unlink(SNAME);
     sem_close(user_sem);
+    sem_destroy(user_sem);
 }
 
 void nodes_sem_del()
 {
     sem_unlink(SNAME_N);
     sem_close(nodes_sem);
+    sem_destroy(nodes_sem);
 }
 
 void shm_user_set()

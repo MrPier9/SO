@@ -264,6 +264,7 @@ void handle_sigint(int signal){
         }
         break;
     default:
+        exit(EXIT_FAILURE);
         break;
     }
 }

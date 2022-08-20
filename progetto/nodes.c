@@ -33,6 +33,8 @@ typedef struct{
     transaction *tp_len;
     int len;
 } tp_block;
+tp_block my_tp;
+struct timespec start, stop;
 
 /*
  * It handles the signal received from other processes
@@ -46,13 +48,19 @@ void read_trans();
 int main(int argc, char *argv[])
 {
     double n;
-    tp_block my_tp;
+
+    if (argc != 3){
+        printf("Argument error\n");
+        exit(EXIT_FAILURE);
+    }
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGCONT, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
 
     wait_next_trans.tv_sec = 0;
+    start.tv_sec = atof(argv[1]);
+    start.tv_nsec = atof(argv[2]);
 
     load_file();
     my_tp.len = 0;
@@ -90,41 +98,33 @@ int main(int argc, char *argv[])
     shmdt(puser_shm);
     shmdt(pnodes_shm);
     while (1){
-        read_trans();
         if(my_tp.len < so_tp_size-1){
-            my_tp.tp_len[my_tp.len] = my_transaction;
+            read_trans();
+            /*my_tp.tp_len[my_tp.len] = my_transaction;*/
             my_tp.len++;
-        }else if(my_tp.len == so_tp_size){
+        }else if(my_tp.len == so_tp_size-1){
+            clock_gettime(CLOCK_REALTIME, &stop);
             my_tp.tp_len[so_tp_size-1].amount = my_reward;
             my_tp.tp_len[so_tp_size-1].receiver = getpid();
             my_tp.tp_len[so_tp_size-1].sender = -1;
             my_tp.tp_len[so_tp_size-1].reward = 0;
-            my_tp.tp_len[so_tp_size-1].timestamp = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+            my_tp.tp_len[so_tp_size-1].timestamp = (stop.tv_sec - start.tv_sec) +
+                    (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+            sem_wait(nodes_sem);
+            /*for(i = 0; i < so_tp_size; i++){
+                printf("    timestamp: %f", (double)my_tp.tp_len[i].timestamp);
+                printf("    transaction sent: %.2f\n", my_tp.tp_len[i].amount + my_tp.tp_len[i].reward);
+                printf("    sent to: %d\n", my_tp.tp_len[i].receiver);
+                printf("    sent by: %d", my_tp.tp_len[i].sender);
+                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        my_tp.tp_len[i].amount, my_tp.tp_len[i].reward);
+                printf("    sent to node: %d\n", \
+                        getpid());
+                printf("--------------------------------------------\n");
+            }*/
+            sem_post(nodes_sem);
         }
     }
-/*
-    duration = time(NULL);
-    while(time(NULL) < duration + 5){
-        sleep(10);
-        sem_wait(nodes_sem);
-        trans_fd = open(TRANSACTION_FIFO, O_RDONLY);
-        TEST_ERROR;
-        read(trans_fd, &my_transaction, sizeof(my_transaction));
-        TEST_ERROR;
-        close(trans_fd);
-        printf("    timestamp: %f", (double)my_transaction.timestamp);
-            printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
-            printf("    sent to: %d\n", my_transaction.receiver);
-            printf("    sent by: %d", my_transaction.sender);
-            printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        my_transaction.amount, my_transaction.reward);
-            printf("    sent to node: %d\n", \
-                        getpid());
-            printf("--------------------------------------------\n");
-        sem_post(nodes_sem);
-        wait_next_trans.tv_nsec = set_wait();
-        nanosleep(&wait_next_trans, NULL);
-    }*/
 
     close(trans_fd);
     kill(getppid(), SIGUSR1);
@@ -140,7 +140,8 @@ void read_trans()
     TEST_ERROR;
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
-    sem_wait(nodes_sem);
+    /*sem_wait(nodes_sem);
+    printf("nodes %d = %f reward\n", getpid(), my_reward);
     printf("    timestamp: %f", (double)my_transaction.timestamp);
     printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
     printf("    sent to: %d\n", my_transaction.receiver);
@@ -148,8 +149,20 @@ void read_trans()
     printf("    transaction amount: %.2f\n    reward: %.2f\n",
            my_transaction.amount, my_transaction.reward);
     printf("    sent to node: %d\n", getpid());
+    printf("--------------------------------------------\n");*/
+    my_tp.tp_len[my_tp.len] = my_transaction;
+    /*printf("trans in position %d", my_tp.len);
+    printf("trans read %d\n", my_tp.len);
+    printf("    timestamp: %f", (double)my_tp.tp_len[my_tp.len].timestamp);
+    printf("    transaction sent: %.2f\n", my_tp.tp_len[my_tp.len].amount + my_tp.tp_len[my_tp.len].reward);
+    printf("    sent to: %d\n", my_tp.tp_len[my_tp.len].receiver);
+    printf("    sent by: %d", my_tp.tp_len[my_tp.len].sender);
+    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        my_tp.tp_len[my_tp.len].amount, my_tp.tp_len[my_tp.len].reward);
+    printf("    sent to node: %d\n", \
+                        getpid());
     printf("--------------------------------------------\n");
-    sem_post(nodes_sem);
+    sem_post(nodes_sem);*/
     wait_next_trans.tv_nsec = set_wait();
     nanosleep(&wait_next_trans, NULL);
 }

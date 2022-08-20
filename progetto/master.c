@@ -22,6 +22,7 @@ int user_done = 0;
 int *user_arr;
 int *nodes_arr;
 int msg_id;
+struct timespec start, stop;
 
 /*
  * It makes and call user processes
@@ -40,7 +41,7 @@ void handle_sigint(int);
 int main()
 {
     int i, duration;
-    struct timespec start, stop;
+
 
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
@@ -85,7 +86,7 @@ int main()
 
 
     do{
-        for (i = 0; i < so_users_num; i++)
+        /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGSTOP);
         }
@@ -104,7 +105,7 @@ int main()
             printf("working nodes %d with budget %d\n", nodes_arr[i], so_budget_init);
         }
         printf("\n");
-
+*/
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
@@ -157,18 +158,18 @@ int main()
 
 void make_users(){
     int i;
-    char *str_budget_init;
-    char *str_reward;
+    char *str_start_s;
+    char *str_start_n;
     char *args_user[] = {USER_PATH, NULL, NULL, NULL};
 
-    str_budget_init = malloc(sizeof(int) * 10);
-    str_reward = malloc(sizeof(int) * 3);
+    str_start_s = malloc(sizeof(double));
+    str_start_n = malloc(sizeof(double));
 
-    sprintf(str_budget_init, "%d", so_budget_init);
-    sprintf(str_reward, "%d", so_reward);
+    sprintf(str_start_s, "%ld", start.tv_sec);
+    sprintf(str_start_n, "%ld", start.tv_nsec);
 
-    args_user[1] = str_budget_init;
-    args_user[2] = str_reward;
+    args_user[1] = str_start_s;
+    args_user[2] = str_start_n;
 
     /*free(str_budget_init);
     free(str_reward);*/
@@ -195,7 +196,18 @@ void make_users(){
 void make_nodes()
 {
     int i;
-    char *args_nodes[] = {NODES_PATH, NULL};
+    char *str_start_s;
+    char *str_start_n;
+    char *args_nodes[] = {NODES_PATH, NULL, NULL, NULL};
+
+    str_start_s = malloc(sizeof(double));
+    str_start_n = malloc(sizeof(double));
+
+    sprintf(str_start_s, "%ld", start.tv_sec);
+    sprintf(str_start_n, "%ld", start.tv_nsec);
+
+    args_nodes[1] = str_start_s;
+    args_nodes[2] = str_start_n;
 
     for (i = 0; i < so_nodes_num; i++)
     {

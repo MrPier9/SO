@@ -28,6 +28,7 @@ struct msg_buf{
     transaction message;
 } transaction_to_send;
 int *list_nodes, *list_user, i;
+struct timespec start, stop;
 
 /*
  *It randomly calculate the value of the transaction
@@ -66,8 +67,10 @@ int main(int argc, char *argv[])
     user_sem = sem_open(SNAME, O_RDWR); /*open semaphore created in master*/
     TEST_ERROR;
     /*printf("user sem set\n");*/
-    budget = atoi(argv[1]);
-    reward = atoi(argv[2]) * 0.01;
+    start.tv_sec = atof(argv[1]);
+    start.tv_nsec = atof(argv[2]);
+
+    /*reward = atoi(argv[2]) * 0.01;*/
     users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
     TEST_ERROR;
     puser_shm = shmat(users_shm_id, NULL, 0);
@@ -96,10 +99,10 @@ int main(int argc, char *argv[])
     /*printf("pid copied\n");*/
 
     wait_next_trans.tv_sec = 0;
+    budget = so_budget_init;
+    reward = so_reward * 0.01;
 
-
-    while (budget >= 2)
-    {
+    while (budget >= 2){
         /*printf("making transaction\n");*/
         transaction_data();
         wait_next_trans.tv_nsec = set_wait();
@@ -137,9 +140,8 @@ int random_receiver()
 void transaction_data()
 {
     int n;
-    struct timespec start, stop;
 
-    clock_gettime(CLOCK_REALTIME, &start);
+    /*clock_gettime(CLOCK_REALTIME, &start);*/
 
     /*printf("pid: %d - budget init= %d\n", getpid(), budget);*/
     transaction_tot = trans_val(budget);

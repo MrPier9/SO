@@ -39,15 +39,13 @@ void user_sem_del()
     sem_destroy(user_sem);
 }
 
-void nodes_sem_del()
-{
+void nodes_sem_del(){
     sem_unlink(SNAME_N);
     sem_close(nodes_sem);
     sem_destroy(nodes_sem);
 }
 
-void shm_user_set()
-{
+void shm_user_set(){
     users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, IPC_CREAT | 0666);
     TEST_ERROR;
     puser_shm = shmat(users_shm_id, NULL, 0);

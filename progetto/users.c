@@ -27,6 +27,13 @@ struct msg_buf{
     long msg_type;
     transaction message;
 } transaction_to_send;
+
+int mb_index_id;
+struct msg_buf_mb{
+    long msg_type;
+    int index;
+} mb_index;
+
 int *list_nodes, *list_user, i;
 struct timespec start, stop;
 
@@ -84,6 +91,9 @@ int main(int argc, char *argv[])
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR;
+    mb_index_id = msgget(MSG_INDEX_KEY, 0666);
+    TEST_ERROR
+
     /*printf("msg set\n");*/
     list_nodes = malloc(sizeof(int) * so_nodes_num);
     list_user = malloc(sizeof(int) * so_users_num);

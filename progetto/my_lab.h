@@ -14,12 +14,16 @@
 #define SNAME_N "nodes_sem"
 #define SHM_NODES_KEY 7295
 #define SHM_USERS_KEY 7437
+#define MASTER_BOOK_KEY 7552
 #define MSG_QUEUE_KEY 7354
+#define MSG_INDEX_KEY 9722
 #define USER_PATH "./users"
 #define NODES_PATH "./nodes"
 #define TRANSACTION_FIFO "trans_fifo"
 #define BILLION 1000000000L
 #define MAX 1024
+#define SO_REGISTRY_SIZE 1000
+#define SO_BLOCK_SIZE 19
 
 typedef struct
 {
@@ -29,11 +33,6 @@ typedef struct
     float amount;
     float reward;
 } transaction;
-
-struct message_buffer{
-    transaction msg_type;
-    char text[MAX];
-};
 
 transaction *transaction_value;
 
@@ -48,6 +47,9 @@ int users_shm_id;
 int *puser_shm;
 int nodes_shm_id;
 int *pnodes_shm;
+int master_book_id;
+transaction (*pmaster_book)[SO_REGISTRY_SIZE]/*[SO_BLOCK_SIZE]*/;
+transaction master_book_page[SO_BLOCK_SIZE];
 
 int so_users_num;
 int so_nodes_num;

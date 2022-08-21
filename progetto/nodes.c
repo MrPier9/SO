@@ -18,22 +18,28 @@
 
 transaction my_transaction;
 int trans_fd;
+int tp_len;
+int trans_counter = 0;
 time_t duration;
 struct timespec wait_next_trans;
 struct sigaction sa;
+
 int msg_id;
 struct msg_buf{
     long msg_type;
     transaction message;
 } transaction_rec;
+
+int mb_index_id;
+struct msg_buf_mb{
+    long msg_type;
+    int index;
+} mb_index;
+
 int *list_nodes, *list_user, i;
 double  my_reward = 0;
+transaction tp_block[SO_BLOCK_SIZE];
 
-typedef struct{
-    transaction *tp_len;
-    int len;
-} tp_block;
-tp_block my_tp;
 struct timespec start, stop;
 
 /*
@@ -47,7 +53,9 @@ void read_trans();
 
 int main(int argc, char *argv[])
 {
+    int flag = 0;
     double n;
+
 
     if (argc != 3){
         printf("Argument error\n");
@@ -63,8 +71,7 @@ int main(int argc, char *argv[])
     start.tv_nsec = atof(argv[2]);
 
     load_file();
-    my_tp.len = 0;
-    my_tp.tp_len = (transaction *) malloc(sizeof(transaction) * so_tp_size);
+    tp_len = 0;
 
     users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
     TEST_ERROR;
@@ -76,6 +83,11 @@ int main(int argc, char *argv[])
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
     TEST_ERROR;
 
+    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, 0666);
+    TEST_ERROR
+    pmaster_book = shmat(master_book_id, NULL, 0);
+    TEST_ERROR
+
     user_sem = sem_open(SNAME, O_RDWR);
     TEST_ERROR;
     nodes_sem = sem_open(SNAME_N, O_RDWR);
@@ -83,6 +95,8 @@ int main(int argc, char *argv[])
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR;
+    mb_index_id = msgget(MSG_INDEX_KEY, 0666);
+    TEST_ERROR
 
     list_user = malloc(sizeof(int)*so_users_num);
     list_nodes = malloc(sizeof(int) * so_nodes_num);
@@ -97,39 +111,49 @@ int main(int argc, char *argv[])
 
     shmdt(puser_shm);
     shmdt(pnodes_shm);
-    while (1){
-        if(my_tp.len < so_tp_size-1){
+    while (trans_counter < so_tp_size){
+        if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
             /*my_tp.tp_len[my_tp.len] = my_transaction;*/
-            my_tp.len++;
-        }else if(my_tp.len == so_tp_size-1){
+            tp_len++;
+        }else if(tp_len == SO_BLOCK_SIZE-1){
             clock_gettime(CLOCK_REALTIME, &stop);
-            my_tp.tp_len[so_tp_size-1].amount = my_reward;
-            my_tp.tp_len[so_tp_size-1].receiver = getpid();
-            my_tp.tp_len[so_tp_size-1].sender = -1;
-            my_tp.tp_len[so_tp_size-1].reward = 0;
-            my_tp.tp_len[so_tp_size-1].timestamp = (stop.tv_sec - start.tv_sec) +
+            tp_block[SO_BLOCK_SIZE-1].amount = my_reward;
+            tp_block[SO_BLOCK_SIZE-1].receiver = getpid();
+            tp_block[SO_BLOCK_SIZE-1].sender = -1;
+            tp_block[SO_BLOCK_SIZE-1].reward = 0;
+            tp_block[SO_BLOCK_SIZE-1].timestamp = (stop.tv_sec - start.tv_sec) +
                     (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
             sem_wait(nodes_sem);
             /*for(i = 0; i < so_tp_size; i++){
-                printf("    timestamp: %f", (double)my_tp.tp_len[i].timestamp);
-                printf("    transaction sent: %.2f\n", my_tp.tp_len[i].amount + my_tp.tp_len[i].reward);
-                printf("    sent to: %d\n", my_tp.tp_len[i].receiver);
-                printf("    sent by: %d", my_tp.tp_len[i].sender);
+                printf("    timestamp: %f", (double)tp_block[i].timestamp);
+                printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
+                printf("    sent to: %d\n", tp_block[i].receiver);
+                printf("    sent by: %d", tp_block[i].sender);
                 printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        my_tp.tp_len[i].amount, my_tp.tp_len[i].reward);
+                        tp_block[i].amount, tp_block[i].reward);
                 printf("    sent to node: %d\n", \
                         getpid());
                 printf("--------------------------------------------\n");
             }*/
+            msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+            for(i = 0; i < SO_BLOCK_SIZE; i++) {
+                pmaster_book[mb_index.index][i] = tp_block[i];
+            }
+            mb_index.index++;
+            msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
             sem_post(nodes_sem);
+            tp_len = 0;
         }
     }
 
     close(trans_fd);
-    kill(getppid(), SIGUSR1);
     sem_close(nodes_sem);
     sem_close(user_sem);
+    shmdt(puser_shm);
+    shmdt(pnodes_shm);
+    shmdt(pmaster_book);
+    exit(0);
 
     return 0;
 }
@@ -150,7 +174,7 @@ void read_trans()
            my_transaction.amount, my_transaction.reward);
     printf("    sent to node: %d\n", getpid());
     printf("--------------------------------------------\n");*/
-    my_tp.tp_len[my_tp.len] = my_transaction;
+    tp_block[tp_len] = my_transaction;
     /*printf("trans in position %d", my_tp.len);
     printf("trans read %d\n", my_tp.len);
     printf("    timestamp: %f", (double)my_tp.tp_len[my_tp.len].timestamp);
@@ -180,6 +204,7 @@ void handle_sig(int signal)
         sem_close(user_sem);
         shmdt(puser_shm);
         shmdt(pnodes_shm);
+        shmdt(pmaster_book);
         exit(0);
         break;
     default:

@@ -22,7 +22,13 @@ int user_done = 0;
 int *user_arr;
 int *nodes_arr;
 int msg_id;
+int mb_index_id;
 struct timespec start, stop;
+
+struct msg_buf_mb{
+    long msg_type;
+    int index;
+} mb_index;
 
 /*
  * It makes and call user processes
@@ -40,7 +46,7 @@ void handle_sigint(int);
 
 int main()
 {
-    int i, duration;
+    int i,j , duration;
 
 
     sa.sa_handler = &handle_sigint;
@@ -59,8 +65,21 @@ int main()
     TEST_ERROR;
     msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR;
+    mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);
+    TEST_ERROR;
+
+    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, IPC_CREAT | 0666);
+    TEST_ERROR;
+    pmaster_book = shmat(master_book_id, NULL, 0);
+    TEST_ERROR;
+
+
     user_arr = (int *)malloc(sizeof(int) * so_users_num);
     nodes_arr = (int *)malloc(sizeof(int) * so_nodes_num);
+
+    mb_index.msg_type = 1;
+    mb_index.index = 0;
+    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
 
     clock_gettime(CLOCK_REALTIME, &start);
     printf("\n\nStarting simulation\n\n");
@@ -106,6 +125,22 @@ int main()
         }
         printf("\n");
 */
+        sem_wait(nodes_sem);
+        msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+        msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+        for(i = 0; i < mb_index.index; i++){
+            for(j = 0; j < SO_BLOCK_SIZE; i++){
+                printf("    timestamp: %f", (double)pmaster_book[i][j].timestamp);
+                printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+                printf("    sent to: %d\n", pmaster_book[i][j].receiver);
+                printf("    sent by: %d", pmaster_book[i][j].sender);
+                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        pmaster_book[i][j].amount, pmaster_book[i][j].reward);
+                printf("--------------------------------------------\n");
+            }
+            printf("\n");
+        }
+        sem_post(nodes_sem);
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
@@ -149,6 +184,7 @@ int main()
     shmctl(users_shm_id, IPC_RMID, NULL);
     /*shmdt(pnodes_shm);*/
     shmctl(nodes_shm_id, IPC_RMID, NULL);
+    shmctl(master_book_id, IPC_RMID, NULL);
     msgctl(msg_id, IPC_RMID, NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");
     sleep(1);
@@ -245,7 +281,9 @@ void handle_sigint(int signal){
         shmctl(users_shm_id, IPC_RMID, NULL);
         shmdt(pnodes_shm);
         shmctl(nodes_shm_id, IPC_RMID, NULL);
+        shmctl(master_book_id, IPC_RMID, NULL);
         msgctl(msg_id, IPC_RMID, NULL);
+        msgctl(mb_index_id, IPC_RMID, NULL);
 
         printf("\n\n\nforced ending simulation...\n\n\n");
         sleep(1);
@@ -267,11 +305,12 @@ void handle_sigint(int signal){
         shmctl(users_shm_id, IPC_RMID, NULL);
         shmdt(pnodes_shm);
         shmctl(nodes_shm_id, IPC_RMID, NULL);
+        shmctl(master_book_id, IPC_RMID, NULL);
         msgctl(msg_id, IPC_RMID, NULL);
+        msgctl(mb_index_id, IPC_RMID, NULL);
 
         printf("\n\n\nending simulation due to node...\n\n\n");
         sleep(1);
-
         exit(0);
         break;
     case SIGUSR2:

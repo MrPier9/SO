@@ -186,6 +186,7 @@ int main()
     shmctl(nodes_shm_id, IPC_RMID, NULL);
     shmctl(master_book_id, IPC_RMID, NULL);
     msgctl(msg_id, IPC_RMID, NULL);
+    msgctl(mb_index_id, IPC_RMID,NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");
     sleep(1);
 

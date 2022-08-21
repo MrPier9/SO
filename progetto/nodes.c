@@ -125,8 +125,8 @@ int main(int argc, char *argv[])
             tp_block[SO_BLOCK_SIZE-1].timestamp = (stop.tv_sec - start.tv_sec) +
                     (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
             sem_wait(nodes_sem);
-            /*for(i = 0; i < so_tp_size; i++){
-                printf("    timestamp: %f", (double)tp_block[i].timestamp);
+            for(i = 0; i < tp_len; i++){
+                printf("    from node \n    timestamp: %f", (double)tp_block[i].timestamp);
                 printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
                 printf("    sent to: %d\n", tp_block[i].receiver);
                 printf("    sent by: %d", tp_block[i].sender);
@@ -135,7 +135,8 @@ int main(int argc, char *argv[])
                 printf("    sent to node: %d\n", \
                         getpid());
                 printf("--------------------------------------------\n");
-            }*/
+            }
+            printf("\n%d\n", tp_len);
             msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
                 pmaster_book[mb_index.index][i] = tp_block[i];
@@ -143,7 +144,9 @@ int main(int argc, char *argv[])
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
             sem_post(nodes_sem);
+
             tp_len = 0;
+            printf("\n%d\n", tp_len);
         }
     }
 

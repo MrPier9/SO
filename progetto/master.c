@@ -56,13 +56,9 @@ int main()
     load_file();
     test_load_file();
     user_sem_set(1);
-    TEST_ERROR;
     nodes_sem_set(1);
-    TEST_ERROR;
     shm_user_set();
-    TEST_ERROR;
     shm_nodes_set();
-    TEST_ERROR;
     msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR;
     mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);

@@ -54,6 +54,8 @@ int random_receiver();
  */
 void handle_sig(int);
 
+int budget_ev();
+
 int main(int argc, char *argv[])
 {
     struct timespec wait_next_trans;
@@ -73,6 +75,8 @@ int main(int argc, char *argv[])
     TEST_ERROR;
     user_sem = sem_open(SNAME, O_RDWR); /*open semaphore created in master*/
     TEST_ERROR;
+    nodes_sem = sem_open(SNAME_N, O_RDWR);
+    TEST_ERROR;
     /*printf("user sem set\n");*/
     start.tv_sec = atof(argv[1]);
     start.tv_nsec = atof(argv[2]);
@@ -88,6 +92,11 @@ int main(int argc, char *argv[])
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
     TEST_ERROR;
     /*printf("shm set\n");*/
+
+    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, 0666);
+    TEST_ERROR
+    pmaster_book = shmat(master_book_id, NULL, 0);
+    TEST_ERROR
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR;
@@ -123,7 +132,14 @@ int main(int argc, char *argv[])
     {
         printf("\nuser %d budget -> %d, bout to send\n", getpid(), budget);
     }*/
+    printf("user %d terminating\n", getpid());
+    close(trans_fd);
+    sem_close(nodes_sem);
     sem_close(user_sem);
+    shmdt(puser_shm);
+    shmdt(pnodes_shm);
+    shmdt(pmaster_book);
+    exit(0);
 
     return 0;
 }
@@ -147,17 +163,16 @@ int random_receiver()
     return n;
 }
 
-void transaction_data()
-{
-    int n;
-
-    /*clock_gettime(CLOCK_REALTIME, &start);*/
-
+void transaction_data(){
+    int n, c = 0;
+    c = budget_ev();
+    /*printf("budget calcolated %d\n", c);*/
     /*printf("pid: %d - budget init= %d\n", getpid(), budget);*/
     transaction_tot = trans_val(budget);
     my_transaction.reward = transaction_tot * reward;
     my_transaction.amount = transaction_tot - my_transaction.reward;
-    budget -= transaction_tot;
+    if(c == 0) budget -= transaction_tot;
+    else budget = so_budget_init - c;
     do {
         n = random_receiver();
     }while (n == getpid());
@@ -191,9 +206,33 @@ void transaction_data()
     TEST_ERROR;
 }
 
+int budget_ev(){
+    int j;
+    transaction temp;
+    int budget_temp = 0;
+
+    sem_wait(nodes_sem);
+    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+    /*printf("\nindex %d\n", mb_index.index);*/
+    for(i = 0; i < mb_index.index; i++){
+        for(j = 0; j < SO_BLOCK_SIZE; j++) {
+            temp = pmaster_book[i][j];
+            if(temp.receiver == getpid()) budget_temp = budget_temp + temp.amount;
+            if(temp.sender == getpid()) budget_temp = budget_temp - (temp.amount + temp.reward);
+        }
+    }
+    sem_post(nodes_sem);
+    return budget_temp;
+}
+
 void handle_sig(int signal)
 {
+    close(trans_fd);
+    sem_close(nodes_sem);
     sem_close(user_sem);
     shmdt(puser_shm);
+    shmdt(pnodes_shm);
+    shmdt(pmaster_book);
     exit(0);
 }

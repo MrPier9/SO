@@ -84,7 +84,7 @@ int main()
     make_users();
 
     /*TEST_ERROR;*/
-    sleep(5);
+    sleep(1);
     sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++)
     {
@@ -109,23 +109,22 @@ int main()
         {
             kill(nodes_arr[i], SIGSTOP);
         }
-
-        for (i = 0; i < so_users_num; i++)
-        {
-            kill(user_arr[i], SIGSTOP);
+*/
+        /*for (i = 0; i < so_users_num; i++){
             printf("working user %d with budget %d\n", user_arr[i], so_budget_init);
         }
-        for (i = 0; i < so_nodes_num; i++)
-        {
+        for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i], so_budget_init);
         }
-        printf("\n");
-*/
+        printf("\n");*/
+
         sem_wait(nodes_sem);
         msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
         msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+        printf("\nmaster: index %d\n", mb_index.index);
         for(i = 0; i < mb_index.index; i++){
-            for(j = 0; j < SO_BLOCK_SIZE; i++){
+            for(j = 0; j < SO_BLOCK_SIZE; j++){
+                printf("[%d][%d]\n", i,j);
                 printf("    timestamp: %f", (double)pmaster_book[i][j].timestamp);
                 printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
                 printf("    sent to: %d\n", pmaster_book[i][j].receiver);
@@ -141,14 +140,14 @@ int main()
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
         printf("%d\n", duration);
-        for (i = 0; i < so_users_num; i++)
+        /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGCONT);
         }
         for (i = 0; i < so_nodes_num; i++)
         {
             kill(nodes_arr[i], SIGCONT);
-        }
+        }*/
     } while (duration < so_sim_sec);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire

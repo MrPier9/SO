@@ -163,12 +163,10 @@ int main()
     for(i = 0; i < so_nodes_num; i++){
         printf("nodes pid n:%d - %d\n", i + 1, pnodes_shm[i]);
     }*/
-    for (i = 0; i < so_users_num; i++)
-    {
+    for (i = 0; i < so_users_num; i++){
         kill(user_arr[i], SIGINT);
     }
-    for (i = 0; i < so_nodes_num; i++)
-    {
+    for (i = 0; i < so_nodes_num; i++){
         kill(nodes_arr[i], SIGINT);
     }
 

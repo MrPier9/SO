@@ -56,8 +56,7 @@ void handle_sig(int);
 
 int budget_ev();
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
     struct timespec wait_next_trans;
 
     if (argc != 3){

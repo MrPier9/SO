@@ -51,8 +51,7 @@ void handle_sig(int);
  */
 void read_trans();
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]){
     int flag = 0;
     double n;
 

@@ -16,8 +16,7 @@
 #include <limits.h>
 #include "my_lab.h"
 
-void user_sem_set(int sem_value)
-{
+void user_sem_set(int sem_value){
     user_sem = sem_open(SNAME, O_CREAT | O_EXCL, 0644, sem_value);
     TEST_ERROR;
 }

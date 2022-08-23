@@ -19,16 +19,22 @@
 pid_t pid;
 struct sigaction sa;
 int user_done = 0;
-int *user_arr;
-int *nodes_arr;
+int (*user_arr)[3];
+int (*nodes_arr)[2];
 int msg_id;
 int mb_index_id;
+int msg_budget_id;
 struct timespec start, stop;
 
 struct msg_buf_mb{
     long msg_type;
     int index;
 } mb_index;
+
+struct msg_buf_budget{
+    long msg_type;
+    double budget;
+} budget_buf;
 
 /*
  * It makes and call user processes
@@ -63,6 +69,8 @@ int main()
     TEST_ERROR;
     mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR;
+    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
+    TEST_ERROR
 
     master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, IPC_CREAT | 0666);
     TEST_ERROR;
@@ -70,8 +78,8 @@ int main()
     TEST_ERROR;
 
 
-    user_arr = (int *)malloc(sizeof(int) * so_users_num);
-    nodes_arr = (int *)malloc(sizeof(int) * so_nodes_num);
+    user_arr = malloc(sizeof(user_arr) * so_users_num);
+    nodes_arr = malloc(sizeof(nodes_arr) * so_nodes_num);
 
     mb_index.msg_type = 1;
     mb_index.index = 0;
@@ -86,39 +94,43 @@ int main()
     /*TEST_ERROR;*/
     sleep(1);
     sem_wait(user_sem);
-    for (i = 0; i < so_users_num; i++)
-    {
-        user_arr[i] = puser_shm[i];
+    for (i = 0; i < so_users_num; i++){
+        user_arr[i][0] = puser_shm[i];
+        user_arr[i][2] = 0;
     }
     sem_post(user_sem);
 
     sem_wait(nodes_sem);
-    for (i = 0; i < so_nodes_num; i++)
-    {
-        nodes_arr[i] = pnodes_shm[i];
+    for (i = 0; i < so_nodes_num; i++){
+        nodes_arr[i][0] = pnodes_shm[i];
     }
     sem_post(nodes_sem);
 
 
     do{
-        /*for (i = 0; i < so_users_num; i++)
-        {
-            kill(user_arr[i], SIGSTOP);
+        for (i = 0; i < so_users_num; i++){
+            if(user_arr[i][2] == 0) {
+                printf("%d\n", user_arr[i][0]);
+                msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), user_arr[i][0], 0);
+                user_arr[i][1] = (int)budget_buf.budget;
+                printf("%.2f\n\n", budget_buf.budget);
+            }
+            if(user_arr[i][1] < 2) user_arr[i][2] = 1;
         }
-        for (i = 0; i < so_nodes_num; i++)
-        {
-            kill(nodes_arr[i], SIGSTOP);
-        }
-*/
-        /*for (i = 0; i < so_users_num; i++){
-            printf("working user %d with budget %d\n", user_arr[i], so_budget_init);
+        /*for (i = 0; i < so_nodes_num; i++){
+            msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), nodes_arr[i][0], 0);
+            nodes_arr[i][1] = budget_buf.budget;
+        }*/
+
+        for (i = 0; i < so_users_num; i++){
+            printf("working user %d with budget %d\n", (int)user_arr[i][0], user_arr[i][1]);
         }
         for (i = 0; i < so_nodes_num; i++){
-            printf("working nodes %d with budget %d\n", nodes_arr[i], so_budget_init);
+            printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
-        printf("\n");*/
+        printf("\n");
 
-        sem_wait(nodes_sem);
+        /*sem_wait(nodes_sem);
         msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
         msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
         printf("\nmaster: index %d\n", mb_index.index);
@@ -135,7 +147,7 @@ int main()
             }
             printf("\n");
         }
-        sem_post(nodes_sem);
+        sem_post(nodes_sem);*/
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
@@ -164,10 +176,10 @@ int main()
         printf("nodes pid n:%d - %d\n", i + 1, pnodes_shm[i]);
     }*/
     for (i = 0; i < so_users_num; i++){
-        kill(user_arr[i], SIGINT);
+        kill(user_arr[i][0], SIGINT);
     }
     for (i = 0; i < so_nodes_num; i++){
-        kill(nodes_arr[i], SIGINT);
+        kill(nodes_arr[i][0], SIGINT);
     }
 
 

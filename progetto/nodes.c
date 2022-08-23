@@ -36,6 +36,12 @@ struct msg_buf_mb{
     int index;
 } mb_index;
 
+int msg_budget_id;
+struct msg_buf_budget{
+    long msg_type;
+    double budget;
+} budget_buf;
+
 int *list_nodes, *list_user, i;
 double  my_reward = 0;
 transaction tp_block[SO_BLOCK_SIZE];

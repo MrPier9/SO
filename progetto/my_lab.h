@@ -17,6 +17,7 @@
 #define MASTER_BOOK_KEY 7552
 #define MSG_QUEUE_KEY 7354
 #define MSG_INDEX_KEY 9722
+#define MSG_BUDGET_KEY 9229
 #define USER_PATH "./users"
 #define NODES_PATH "./nodes"
 #define TRANSACTION_FIFO "trans_fifo"

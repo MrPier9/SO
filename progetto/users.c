@@ -18,10 +18,11 @@
 
 int transaction_tot; /*cifra totale transazione*/
 float reward;        /*reward = x% del netto*/
-int budget;          /*netto transazione*/
+double budget;          /*netto transazione*/
 transaction my_transaction;
 int trans_fd;
 struct sigaction sa;
+
 int msg_id;
 struct msg_buf{
     long msg_type;
@@ -33,6 +34,12 @@ struct msg_buf_mb{
     long msg_type;
     int index;
 } mb_index;
+
+int msg_budget_id;
+struct msg_buf_budget{
+    long msg_type;
+    double budget;
+} budget_buf;
 
 int *list_nodes, *list_user, i;
 struct timespec start, stop;
@@ -66,6 +73,7 @@ int main(int argc, char *argv[]){
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGUSR1, &sa, NULL);
 
     sleep(1);
 
@@ -101,6 +109,10 @@ int main(int argc, char *argv[]){
     TEST_ERROR;
     mb_index_id = msgget(MSG_INDEX_KEY, 0666);
     TEST_ERROR
+    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
+    TEST_ERROR
+
+
 
     /*printf("msg set\n");*/
     list_nodes = malloc(sizeof(int) * so_nodes_num);
@@ -148,8 +160,7 @@ int trans_val(int random_amount)
     int n;
     srand(time(NULL) * getpid());
     n = rand() % random_amount;
-    if (n == 0)
-    {
+    if (n == 0){
         n += 1;
     }
     return n;
@@ -170,8 +181,15 @@ void transaction_data(){
     transaction_tot = trans_val(budget);
     my_transaction.reward = transaction_tot * reward;
     my_transaction.amount = transaction_tot - my_transaction.reward;
+
     if(c == 0) budget -= transaction_tot;
-    else budget = so_budget_init - c;
+    else if(c > 0) budget = so_budget_init - c;
+    else budget = so_budget_init + c;
+    printf("budget %d = %.2f\n", getpid(), budget);
+    budget_buf.msg_type = getpid();
+    budget_buf.budget = budget;
+    msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+
     do {
         n = random_receiver();
     }while (n == getpid());
@@ -225,13 +243,18 @@ int budget_ev(){
     return budget_temp;
 }
 
-void handle_sig(int signal)
-{
-    close(trans_fd);
-    sem_close(nodes_sem);
-    sem_close(user_sem);
-    shmdt(puser_shm);
-    shmdt(pnodes_shm);
-    shmdt(pmaster_book);
-    exit(0);
+void handle_sig(int signal){
+    switch (signal) {
+        case SIGINT:
+            close(trans_fd);
+            sem_close(nodes_sem);
+            sem_close(user_sem);
+            shmdt(puser_shm);
+            shmdt(pnodes_shm);
+            shmdt(pmaster_book);
+            exit(0);
+
+        default:
+            break;
+    }
 }

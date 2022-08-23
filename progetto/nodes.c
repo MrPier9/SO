@@ -44,6 +44,7 @@ struct msg_buf_budget{
 
 int *list_nodes, *list_user, i;
 double  my_reward = 0;
+double total_reward = 0;
 transaction tp_block[SO_BLOCK_SIZE];
 
 struct timespec start, stop;
@@ -102,6 +103,8 @@ int main(int argc, char *argv[]){
     TEST_ERROR;
     mb_index_id = msgget(MSG_INDEX_KEY, 0666);
     TEST_ERROR
+    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
+    TEST_ERROR
 
     list_user = malloc(sizeof(int)*so_users_num);
     list_nodes = malloc(sizeof(int) * so_nodes_num);
@@ -119,7 +122,13 @@ int main(int argc, char *argv[]){
         /*printf("trans counter %d: %d\n", getpid(), trans_counter);*/
         if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
-            /*my_tp.tp_len[my_tp.len] = my_transaction;*/
+            /*my_tp.tp_len[my_tp.len] = my_transaction;
+            sem_wait(nodes_sem);
+            budget_buf.msg_type = getpid();
+            printf("tot %.2f\n", total_reward);
+            budget_buf.budget = total_reward;
+            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+            sem_post(nodes_sem);*/
             tp_len++;
             trans_counter++;
         }else if(tp_len == SO_BLOCK_SIZE-1){
@@ -165,9 +174,13 @@ int main(int argc, char *argv[]){
             }
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+            budget_buf.msg_type = getpid();
+            budget_buf.budget = total_reward;
+            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
             sem_post(nodes_sem);
 
             tp_len = 0;
+            my_reward = 0;
         }
     }
 
@@ -182,12 +195,12 @@ int main(int argc, char *argv[]){
     return 0;
 }
 
-void read_trans()
-{
+void read_trans(){
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
-    TEST_ERROR;
+    TEST_ERROR
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
+    total_reward = total_reward + my_transaction.reward;
     /*sem_wait(nodes_sem);
     printf("nodes %d = %f reward\n", getpid(), my_reward);
     printf("    timestamp: %f", (double)my_transaction.timestamp);

@@ -77,9 +77,9 @@ int main()
     pmaster_book = shmat(master_book_id, NULL, 0);
     TEST_ERROR;
 
-
-    user_arr = malloc(sizeof(user_arr) * so_users_num);
     nodes_arr = malloc(sizeof(nodes_arr) * so_nodes_num);
+    user_arr = malloc(sizeof(user_arr) * so_users_num);
+
 
     mb_index.msg_type = 1;
     mb_index.index = 0;
@@ -103,24 +103,24 @@ int main()
     sem_wait(nodes_sem);
     for (i = 0; i < so_nodes_num; i++){
         nodes_arr[i][0] = pnodes_shm[i];
+        nodes_arr[i][1] = 0;
     }
     sem_post(nodes_sem);
 
-
     do{
+
         for (i = 0; i < so_users_num; i++){
             if(user_arr[i][2] == 0) {
-                printf("%d\n", user_arr[i][0]);
                 msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), user_arr[i][0], 0);
-                user_arr[i][1] = (int)budget_buf.budget;
-                printf("%.2f\n\n", budget_buf.budget);
+                user_arr[i][1] = budget_buf.budget;
             }
             if(user_arr[i][1] < 2) user_arr[i][2] = 1;
         }
-        /*for (i = 0; i < so_nodes_num; i++){
-            msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), nodes_arr[i][0], 0);
-            nodes_arr[i][1] = budget_buf.budget;
-        }*/
+
+        for (i = 0; i < so_nodes_num; i++){
+            msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), nodes_arr[i][0], IPC_NOWAIT);
+                nodes_arr[i][1] = budget_buf.budget;
+        }
 
         for (i = 0; i < so_users_num; i++){
             printf("working user %d with budget %d\n", (int)user_arr[i][0], user_arr[i][1]);
@@ -192,6 +192,7 @@ int main()
     shmctl(master_book_id, IPC_RMID, NULL);
     msgctl(msg_id, IPC_RMID, NULL);
     msgctl(mb_index_id, IPC_RMID,NULL);
+    msgctl(msg_budget_id, IPC_RMID, NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");
     sleep(1);
 
@@ -283,13 +284,12 @@ void handle_sigint(int signal){
         }
         user_sem_del();
         nodes_sem_del();
-        shmdt(puser_shm);
         shmctl(users_shm_id, IPC_RMID, NULL);
-        shmdt(pnodes_shm);
         shmctl(nodes_shm_id, IPC_RMID, NULL);
         shmctl(master_book_id, IPC_RMID, NULL);
         msgctl(msg_id, IPC_RMID, NULL);
         msgctl(mb_index_id, IPC_RMID, NULL);
+        msgctl(msg_budget_id, IPC_RMID, NULL);
 
         printf("\n\n\nforced ending simulation...\n\n\n");
         sleep(1);

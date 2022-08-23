@@ -143,7 +143,7 @@ int main(int argc, char *argv[]){
     {
         printf("\nuser %d budget -> %d, bout to send\n", getpid(), budget);
     }*/
-    printf("user %d terminating\n", getpid());
+    /*printf("user %d terminating\n", getpid());*/
     close(trans_fd);
     sem_close(nodes_sem);
     sem_close(user_sem);
@@ -185,7 +185,7 @@ void transaction_data(){
     if(c == 0) budget -= transaction_tot;
     else if(c > 0) budget = so_budget_init - c;
     else budget = so_budget_init + c;
-    printf("budget %d = %.2f\n", getpid(), budget);
+    /*printf("budget %d = %.2f\n", getpid(), budget);*/
     budget_buf.msg_type = getpid();
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);

@@ -112,18 +112,18 @@ int main(int argc, char *argv[])
 
     while (trans_counter < so_tp_size){
         /*printf("trans counter %d: %d\n", getpid(), trans_counter);*/
-        if(tp_len < SO_BLOCK_SIZE){
+        if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
             /*my_tp.tp_len[my_tp.len] = my_transaction;*/
             tp_len++;
             trans_counter++;
-        }else if(tp_len == SO_BLOCK_SIZE){
+        }else if(tp_len == SO_BLOCK_SIZE-1){
             clock_gettime(CLOCK_REALTIME, &stop);
-            tp_block[SO_BLOCK_SIZE].amount = my_reward;
-            tp_block[SO_BLOCK_SIZE].receiver = getpid();
-            tp_block[SO_BLOCK_SIZE].sender = -1;
-            tp_block[SO_BLOCK_SIZE].reward = 0;
-            tp_block[SO_BLOCK_SIZE].timestamp = (stop.tv_sec - start.tv_sec) +
+            tp_block[SO_BLOCK_SIZE-1].amount = my_reward;
+            tp_block[SO_BLOCK_SIZE-1].receiver = getpid();
+            tp_block[SO_BLOCK_SIZE-1].sender = -1;
+            tp_block[SO_BLOCK_SIZE-1].reward = 0;
+            tp_block[SO_BLOCK_SIZE-1].timestamp = (stop.tv_sec - start.tv_sec) +
                     (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
             sem_wait(nodes_sem);
             /*for(i = 0; i < tp_len; i++){

@@ -39,6 +39,7 @@ struct msg_buf_mb{
 int msg_budget_id;
 struct msg_buf_budget{
     long msg_type;
+    int pid;
     double budget;
 } budget_buf;
 
@@ -174,9 +175,12 @@ int main(int argc, char *argv[]){
             }
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-            budget_buf.msg_type = getpid();
+            budget_buf.msg_type = 2;
+            budget_buf.pid = getpid();
             budget_buf.budget = total_reward;
+            printf("\n\ntotal reward to send %.2f\n", budget_buf.budget);
             msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+            kill(getppid(), SIGUSR1);
             sem_post(nodes_sem);
 
             tp_len = 0;

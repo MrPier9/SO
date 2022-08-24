@@ -33,6 +33,7 @@ struct msg_buf_mb{
 
 struct msg_buf_budget{
     long msg_type;
+    int pid;
     double budget;
 } budget_buf;
 
@@ -58,6 +59,7 @@ int main()
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
+    sigaction(SIGUSR2, &sa, NULL);
 
     load_file();
     test_load_file();
@@ -108,22 +110,10 @@ int main()
     sem_post(nodes_sem);
 
     do{
-
         for (i = 0; i < so_users_num; i++){
-            if(user_arr[i][2] == 0) {
-                msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), user_arr[i][0], 0);
-                user_arr[i][1] = budget_buf.budget;
+            if(user_arr[i][1] >= 2) {
+                printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }
-            if(user_arr[i][1] < 2) user_arr[i][2] = 1;
-        }
-
-        for (i = 0; i < so_nodes_num; i++){
-            msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), nodes_arr[i][0], IPC_NOWAIT);
-                nodes_arr[i][1] = budget_buf.budget;
-        }
-
-        for (i = 0; i < so_users_num; i++){
-            printf("working user %d with budget %d\n", (int)user_arr[i][0], user_arr[i][1]);
         }
         for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
@@ -151,7 +141,7 @@ int main()
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
-        printf("%d\n", duration);
+        printf("duration %d\n", duration);
         /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGCONT);
@@ -185,9 +175,10 @@ int main()
 
     user_sem_del();
     nodes_sem_del();
-    /*shmdt(puser_shm);*/
+    shmdt(puser_shm);
     shmctl(users_shm_id, IPC_RMID, NULL);
-    /*shmdt(pnodes_shm);*/
+    shmdt(pnodes_shm);
+    shmdt(pmaster_book);
     shmctl(nodes_shm_id, IPC_RMID, NULL);
     shmctl(master_book_id, IPC_RMID, NULL);
     msgctl(msg_id, IPC_RMID, NULL);
@@ -282,14 +273,17 @@ void handle_sigint(int signal){
         {
             kill(pnodes_shm[i], SIGINT);
         }
-        user_sem_del();
-        nodes_sem_del();
-        shmctl(users_shm_id, IPC_RMID, NULL);
-        shmctl(nodes_shm_id, IPC_RMID, NULL);
-        shmctl(master_book_id, IPC_RMID, NULL);
-        msgctl(msg_id, IPC_RMID, NULL);
-        msgctl(mb_index_id, IPC_RMID, NULL);
-        msgctl(msg_budget_id, IPC_RMID, NULL);
+            user_sem_del();
+            nodes_sem_del();
+            shmdt(puser_shm);
+            shmctl(users_shm_id, IPC_RMID, NULL);
+            shmdt(pnodes_shm);
+            shmdt(pmaster_book);
+            shmctl(nodes_shm_id, IPC_RMID, NULL);
+            shmctl(master_book_id, IPC_RMID, NULL);
+            msgctl(msg_id, IPC_RMID, NULL);
+            msgctl(mb_index_id, IPC_RMID,NULL);
+            msgctl(msg_budget_id, IPC_RMID, NULL);
 
         printf("\n\n\nforced ending simulation...\n\n\n");
         sleep(1);
@@ -297,41 +291,23 @@ void handle_sigint(int signal){
         exit(0);
         break;
     case SIGUSR1:
-        for (i = 0; i < so_users_num; i++)
-        {
-            kill(puser_shm[i], SIGINT);
+        msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 2, 0);
+        for (i = 0; i < so_nodes_num; i++){
+            if(nodes_arr[i][0] == budget_buf.pid) {
+                nodes_arr[i][1] = budget_buf.budget;
+            }
         }
-        for (i = 0; i < so_nodes_num; i++)
-        {
-            kill(pnodes_shm[i], SIGINT);
-        }
-        user_sem_del();
-        nodes_sem_del();
-        shmdt(puser_shm);
-        shmctl(users_shm_id, IPC_RMID, NULL);
-        shmdt(pnodes_shm);
-        shmctl(nodes_shm_id, IPC_RMID, NULL);
-        shmctl(master_book_id, IPC_RMID, NULL);
-        msgctl(msg_id, IPC_RMID, NULL);
-        msgctl(mb_index_id, IPC_RMID, NULL);
-
-        printf("\n\n\nending simulation due to node...\n\n\n");
-        sleep(1);
-        exit(0);
         break;
     case SIGUSR2:
-        user_done++;
-        printf("\n\n\nuser done: %d\n\n\n", user_done);
-        if (user_done == so_users_num)
-        {
-            for (i = 0; i < so_nodes_num; i++)
-            {
-                kill(pnodes_shm[i], SIGINT);
-            }
+        msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 1, 0);
+        for (i = 0; i < so_users_num; i++){
+                if(user_arr[i][0] == budget_buf.pid) {
+                    user_arr[i][1] = budget_buf.budget;
+                    if(user_arr[i][1] < 2) user_arr[i][2] = 1;
+                }
         }
         break;
     default:
         exit(EXIT_FAILURE);
-        break;
     }
 }

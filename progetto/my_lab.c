@@ -21,11 +21,9 @@ void user_sem_set(int sem_value){
     TEST_ERROR;
 }
 
-void nodes_sem_set(int sem_value)
-{
+void nodes_sem_set(int sem_value){
     nodes_sem = sem_open(SNAME_N, O_CREAT | O_EXCL, 0644, sem_value);
-    if (errno)
-    {
+    if (errno){
         TEST_ERROR;
         /*exit(EXIT_FAILURE);*/
     }

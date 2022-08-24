@@ -26,8 +26,7 @@
 #define SO_REGISTRY_SIZE 1000
 #define SO_BLOCK_SIZE 25
 
-typedef struct
-{
+typedef struct{
     double timestamp;
     pid_t sender;
     pid_t receiver;

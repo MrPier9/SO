@@ -38,6 +38,7 @@ struct msg_buf_mb{
 int msg_budget_id;
 struct msg_buf_budget{
     long msg_type;
+    int pid;
     double budget;
 } budget_buf;
 
@@ -73,7 +74,6 @@ int main(int argc, char *argv[]){
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGUSR1, &sa, NULL);
 
     sleep(1);
 
@@ -185,10 +185,11 @@ void transaction_data(){
     if(c == 0) budget -= transaction_tot;
     else if(c > 0) budget = so_budget_init - c;
     else budget = so_budget_init + c;
-    /*printf("budget %d = %.2f\n", getpid(), budget);*/
-    budget_buf.msg_type = getpid();
+    budget_buf.msg_type = 1;
+    budget_buf.pid = getpid();
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+    kill(getppid(), SIGUSR2);
 
     do {
         n = random_receiver();

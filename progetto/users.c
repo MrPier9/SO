@@ -21,6 +21,7 @@ float reward;        /*reward = x% del netto*/
 double budget;          /*netto transazione*/
 transaction my_transaction;
 int trans_fd;
+int try = 0;
 struct sigaction sa;
 
 int msg_id;
@@ -39,6 +40,7 @@ int msg_budget_id;
 struct msg_buf_budget{
     long msg_type;
     int pid;
+    int terminated;
     double budget;
 } budget_buf;
 
@@ -52,7 +54,7 @@ int trans_val(int);
 /*
  *It sets the transaction value, its net and reward
  */
-void transaction_data();
+int transaction_data();
 /*
  *It randomly calculates the receiver of the transaction
  */
@@ -67,6 +69,7 @@ int budget_ev();
 int main(int argc, char *argv[]){
     struct timespec wait_next_trans;
 
+
     if (argc != 3){
         printf("Argument error\n");
         exit(EXIT_FAILURE);
@@ -74,6 +77,7 @@ int main(int argc, char *argv[]){
 
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
+    budget_buf.terminated = 0;
 
     sleep(1);
 
@@ -132,18 +136,20 @@ int main(int argc, char *argv[]){
     budget = so_budget_init;
     reward = so_reward * 0.01;
 
-    while (budget >= 2){
+    while (try < so_retry){
         /*printf("making transaction\n");*/
-        transaction_data();
+        try = try + transaction_data();
         wait_next_trans.tv_nsec = set_wait();
         nanosleep(&wait_next_trans, NULL);
     }
 
-    /*if (budget < 2)
-    {
-        printf("\nuser %d budget -> %d, bout to send\n", getpid(), budget);
-    }*/
-    /*printf("user %d terminating\n", getpid());*/
+    budget_buf.msg_type = 1;
+    budget_buf.terminated = 1;
+    budget_buf.pid = getpid();
+    budget_buf.budget = budget;
+    msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+
+    printf("\nuser %d terminating with retry %d and budget %.2f\n", getpid(), try, budget);
     close(trans_fd);
     sem_close(nodes_sem);
     sem_close(user_sem);
@@ -173,7 +179,7 @@ int random_receiver()
     return n;
 }
 
-void transaction_data(){
+int transaction_data(){
     int n, c = 0;
     c = budget_ev();
     /*printf("budget calcolated %d\n", c);*/
@@ -190,7 +196,8 @@ void transaction_data(){
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
     kill(getppid(), SIGUSR2);
-
+    if(budget < 2) return 1;
+    else try = 0;
     do {
         n = random_receiver();
     }while (n == getpid());
@@ -222,6 +229,7 @@ void transaction_data(){
     transaction_to_send.message = my_transaction;
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
     TEST_ERROR;
+    return 0;
 }
 
 int budget_ev(){

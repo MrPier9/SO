@@ -34,6 +34,7 @@ struct msg_buf_mb{
 struct msg_buf_budget{
     long msg_type;
     int pid;
+    int terminated;
     double budget;
 } budget_buf;
 
@@ -111,7 +112,7 @@ int main()
 
     do{
         for (i = 0; i < so_users_num; i++){
-            if(user_arr[i][1] >= 2) {
+            if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }
         }
@@ -303,7 +304,7 @@ void handle_sigint(int signal){
         for (i = 0; i < so_users_num; i++){
                 if(user_arr[i][0] == budget_buf.pid) {
                     user_arr[i][1] = budget_buf.budget;
-                    if(user_arr[i][1] < 2) user_arr[i][2] = 1;
+                    if(budget_buf.terminated == 1) user_arr[i][2] = 1;
                 }
         }
         break;

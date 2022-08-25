@@ -28,7 +28,7 @@ int msg_id;
 struct msg_buf{
     long msg_type;
     transaction message;
-} transaction_to_send;
+} transaction_to_send, transaction_rejected;
 
 int mb_index_id;
 struct msg_buf_mb{
@@ -46,6 +46,7 @@ struct msg_buf_budget{
 
 int *list_nodes, *list_user, i;
 struct timespec start, stop;
+int budget_init;
 
 /*
  *It randomly calculate the value of the transaction
@@ -74,11 +75,11 @@ int main(int argc, char *argv[]){
         printf("Argument error\n");
         exit(EXIT_FAILURE);
     }
-
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
+    sigaction(SIGUSR1, &sa, NULL);
     budget_buf.terminated = 0;
-
+    budget_init = so_budget_init;
     sleep(1);
 
     load_file();
@@ -137,11 +138,10 @@ int main(int argc, char *argv[]){
     reward = so_reward * 0.01;
 
     while (try < so_retry){
-        /*printf("making transaction\n");*/
         n = transaction_data();
         try = try + n;
-        if(try >= 2) printf("try %d\n", try);
-        wait_next_trans.tv_nsec = set_wait();
+
+        wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec, so_min_trans_gen_nsec);
         nanosleep(&wait_next_trans, NULL);
     }
 
@@ -151,7 +151,7 @@ int main(int argc, char *argv[]){
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
 
-    printf("\nuser %d terminating with retry %d and budget %.2f\n", getpid(), try, budget);
+    /*printf("\nuser %d terminating with retry %d and budget %.2f\n", getpid(), try, budget);*/
     close(trans_fd);
     sem_close(nodes_sem);
     sem_close(user_sem);
@@ -218,24 +218,8 @@ int transaction_data(){
     my_transaction.timestamp = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     my_transaction.sender = getpid();
 
-    /*trans_fd = open(TRANSACTION_FIFO, O_WRONLY);
-    TEST_ERROR;
-    write(trans_fd, &my_transaction, sizeof(my_transaction));
-    TEST_ERROR;
-    close(trans_fd);
-    sem_wait(user_sem);
-
-    printf("    timestamp: %f - sender %d\n", (double)my_transaction.timestamp, my_transaction.sender);
-    printf("    transaction sent: %d\n", transaction_tot);
-    printf("    sent to: %d\n", my_transaction.receiver);
-    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                my_transaction.amount, my_transaction.reward);
-    printf("    sent to node: %d\n  new budget: %.2f\n", \
-                pnodes_shm[rand() % so_nodes_num], budget);
-    printf("--------------------------------------------\n");
-    sem_post(user_sem);*/
     node_pid = list_nodes[rand() % so_nodes_num];
-    printf("send to node %d\n", node_pid);
+
     transaction_to_send.msg_type = node_pid;
     transaction_to_send.message = my_transaction;
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
@@ -246,12 +230,12 @@ int transaction_data(){
 double budget_ev(){
     int j;
     transaction temp;
-    double budget_temp = so_budget_init;
+    double budget_temp = budget_init;
 
     sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-    /*printf("\nindex %d\n", mb_index.index);*/
+
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             temp = pmaster_book[i][j];
@@ -280,6 +264,13 @@ void handle_sig(int signal){
             shmdt(pmaster_book);
             exit(0);
 
+        case SIGUSR1:
+            msgrcv(msg_id, &transaction_rejected, sizeof(transaction_rejected), 1, 0);
+            budget_init = transaction_rejected.message.amount + transaction_rejected.message.reward;
+            /*to fix evaluation budget because user must count transaction not yet in master book
+             * could be an option to make a buffer to empty when a transaction is read by user
+             */
+            break;
         default:
             break;
     }

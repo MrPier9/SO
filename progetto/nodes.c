@@ -60,9 +60,7 @@ void handle_sig(int);
 void read_trans();
 
 int main(int argc, char *argv[]){
-    int flag = 0;
-    double n;
-
+    struct timespec wait_writing_mb;
 
     if (argc != 3){
         printf("Argument error\n");
@@ -110,6 +108,8 @@ int main(int argc, char *argv[]){
     list_user = malloc(sizeof(int)*so_users_num);
     list_nodes = malloc(sizeof(int) * so_nodes_num);
 
+    wait_writing_mb.tv_sec = 0;
+
     for(i = 0; i < so_users_num; i++){
         list_user[i] = puser_shm[i];
     }
@@ -123,14 +123,6 @@ int main(int argc, char *argv[]){
         /*printf("trans counter %d: %d\n", getpid(), trans_counter);*/
         if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
-            /*my_tp.tp_len[my_tp.len] = my_transaction;
-            sem_wait(nodes_sem);
-            budget_buf.msg_type = getpid();
-            printf("tot %.2f\n", total_reward);
-            budget_buf.budget = total_reward;
-            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
-            sem_post(nodes_sem);*/
-            printf("\n\n%d tp len = %d\n\n", getpid(), tp_len);
             trans_counter++;
         }else if(tp_len == SO_BLOCK_SIZE-1){
             clock_gettime(CLOCK_REALTIME, &stop);
@@ -140,53 +132,40 @@ int main(int argc, char *argv[]){
             tp_block[SO_BLOCK_SIZE-1].reward = 0;
             tp_block[SO_BLOCK_SIZE-1].timestamp = (stop.tv_sec - start.tv_sec) +
                     (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
+
+            wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
+            nanosleep(&wait_writing_mb, NULL);
             sem_wait(nodes_sem);
-            /*for(i = 0; i < tp_len; i++){
-                printf("    from node \n    timestamp: %f", (double)tp_block[i].timestamp);
-                printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
-                printf("    sent to: %d\n", tp_block[i].receiver);
-                printf("    sent by: %d", tp_block[i].sender);
-                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        tp_block[i].amount, tp_block[i].reward);
-                printf("    sent to node: %d\n", \
-                        getpid());
-                printf("--------------------------------------------\n");
-            }*/
             msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
-                /*printf("    from node %d\n    timestamp: %f", getpid(), (double)tp_block[i].timestamp);
-                printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
-                printf("    sent to: %d\n", tp_block[i].receiver);
-                printf("    sent by: %d", tp_block[i].sender);
-                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        tp_block[i].amount, tp_block[i].reward);
-                printf("    sent to node: %d\n", \
-                        getpid());
-                printf("--------------------------------------------\n");
-                printf("\n[%d][%d]\n", mb_index.index, i);*/
                 pmaster_book[mb_index.index][i] = tp_block[i];
-                /*printf("    timestamp: %f", (double)pmaster_book[mb_index.index][i].timestamp);
-                printf("    transaction sent: %.2f\n", pmaster_book[mb_index.index][i].amount + pmaster_book[mb_index.index][i].reward);
-                printf("    sent to: %d\n", pmaster_book[mb_index.index][i].receiver);
-                printf("    sent by: %d", pmaster_book[mb_index.index][i].sender);
-                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        pmaster_book[mb_index.index][i].amount, pmaster_book[mb_index.index][i].reward);
-                printf("--------------------------------------------\n\n\n");*/
+
+                tp_block[i].reward = 0;
+                tp_block[i].amount = 0;
+                tp_block[i].sender = 0;
+                tp_block[i].timestamp = 0;
+                tp_block[i].receiver = 0;
             }
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
             budget_buf.msg_type = 2;
             budget_buf.pid = getpid();
             budget_buf.budget = total_reward;
-            /*printf("\n\ntotal reward to send %.2f\n", budget_buf.budget);*/
+
             msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
             kill(getppid(), SIGUSR1);
-
+            sem_post(nodes_sem);
             tp_len = 0;
             printf("\n\ntp a 0\n\n");
             my_reward = 0;
-            sem_post(nodes_sem);
         }
+    }
+
+    while(1){
+        msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
+        transaction_rec.msg_type = 1;
+        msgsnd(msg_id, &transaction_rec, sizeof(transaction_rec), 0);
+        kill(transaction_rec.message.sender, SIGUSR1);
     }
 
     close(trans_fd);
@@ -203,36 +182,13 @@ int main(int argc, char *argv[]){
 void read_trans(){
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
     TEST_ERROR
-    tp_len++;
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
     total_reward = total_reward + my_transaction.reward;
-    /*sem_wait(nodes_sem);
-    printf("nodes %d = %f reward\n", getpid(), my_reward);
-    printf("    timestamp: %f", (double)my_transaction.timestamp);
-    printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
-    printf("    sent to: %d\n", my_transaction.receiver);
-    printf("    sent by: %d", my_transaction.sender);
-    printf("    transaction amount: %.2f\n    reward: %.2f\n",
-           my_transaction.amount, my_transaction.reward);
-    printf("    sent to node: %d\n", getpid());
-    printf("--------------------------------------------\n");
-    sem_post(nodes_sem);*/
     tp_block[tp_len] = my_transaction;
-    /*printf("trans in position %d", my_tp.len);
-    printf("trans read %d\n", my_tp.len);
-    printf("    timestamp: %f", (double)my_tp.tp_len[my_tp.len].timestamp);
-    printf("    transaction sent: %.2f\n", my_tp.tp_len[my_tp.len].amount + my_tp.tp_len[my_tp.len].reward);
-    printf("    sent to: %d\n", my_tp.tp_len[my_tp.len].receiver);
-    printf("    sent by: %d", my_tp.tp_len[my_tp.len].sender);
-    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        my_tp.tp_len[my_tp.len].amount, my_tp.tp_len[my_tp.len].reward);
-    printf("    sent to node: %d\n", \
-                        getpid());
-    printf("--------------------------------------------\n");
-    sem_post(nodes_sem);*/
-    wait_next_trans.tv_nsec = set_wait();
+    wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec,so_min_trans_gen_nsec);
     nanosleep(&wait_next_trans, NULL);
+    tp_len++;
 }
 
 void handle_sig(int signal)
@@ -243,21 +199,18 @@ void handle_sig(int signal)
         break;
     case SIGINT:
         sem_wait(nodes_sem);
-        printf("\ntransactions elaborated %d\n", trans_counter);
-        if(tp_len == 0) {
-            printf("\nnode %d has 0 transaction still in transaction_pool\n", getpid());
-        }
-        else {
-            printf("\nnode %d transaction still in transaction_pool\n\n", getpid());
-        }
-        for(i = 0; i < SO_BLOCK_SIZE; i++){/* could be til tp_len, to try | SO_BLOCK_SIZE */
-            printf("    timestamp: %f", (double)pmaster_book[mb_index.index][i].timestamp);
-            printf("    transaction sent: %.2f\n", pmaster_book[mb_index.index][i].amount + pmaster_book[mb_index.index][i].reward);
-            printf("    sent to: %d\n", pmaster_book[mb_index.index][i].receiver);
-            printf("    sent by: %d", pmaster_book[mb_index.index][i].sender);
+
+        printf("\n\nnode %d\n", getpid());
+        printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
+        printf("--------------------------------------------\n");
+        for(i = 0; i < tp_len; i++){/* could be til tp_len, to try | SO_BLOCK_SIZE */
+            printf("    timestamp: %f",  (double)tp_block[i].timestamp);
+            printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
+            printf("    sent to: %d\n", tp_block[i].receiver);
+            printf("    sent by: %d", tp_block[i].sender);
             printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        pmaster_book[mb_index.index][i].amount, pmaster_book[mb_index.index][i].reward);
-            printf("--------------------------------------------\n\n");
+                        tp_block[i].amount, tp_block[i].reward);
+            printf("--------------------------------------------\n");
         }
         sem_post(nodes_sem);
 

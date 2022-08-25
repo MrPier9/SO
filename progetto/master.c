@@ -52,10 +52,8 @@ void make_nodes();
  */
 void handle_sigint(int);
 
-int main()
-{
-    int i,j , duration;
-
+int main(){
+    int i, duration;
 
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
@@ -113,7 +111,7 @@ int main()
 
     do{
         /*sem_wait(user_sem);*/
-        /*for (i = 0; i < so_users_num; i++){
+        for (i = 0; i < so_users_num; i++){
             if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }else{
@@ -123,7 +121,7 @@ int main()
         for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
-        printf("\n");*/
+        printf("\n");
         /*sem_post(user_sem);*/
 
         /*sem_wait(nodes_sem);
@@ -147,7 +145,7 @@ int main()
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
-        printf("duration %d\n", duration);
+        /*printf("duration %d\n", duration);*/
         /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGCONT);
@@ -183,7 +181,7 @@ int main()
         }
     }
 
-    printf("\n\nat ending simulation\n");
+    printf("\n\n        at ending simulation\n");
     for (i = 0; i < so_users_num; i++){
         if(user_arr[i][2] == 0) {
             printf("user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
@@ -231,19 +229,14 @@ void make_users(){
     /*free(str_budget_init);
     free(str_reward);*/
 
-    for (i = 0; i < so_users_num; i++)
-    {
+    for (i = 0; i < so_users_num; i++){
         pid = fork();
-        if (pid < 0)
-        {
+        if (pid < 0){
             TEST_ERROR;
             exit(EXIT_FAILURE);
         }
-        else if (pid == 0)
-        {
-            /*sem_wait(user_sem);*/
+        else if (pid == 0){
             puser_shm[i] = getpid();
-            /*sem_post(user_sem);*/
             execve(USER_PATH, args_user, NULL);
             TEST_ERROR;
         }

@@ -101,6 +101,6 @@ void shm_nodes_set();
 /*
  * It sets the timer for the next transaction creation
  */
-double set_wait();
+double set_wait(unsigned long, unsigned long);
 
 #endif

@@ -57,17 +57,15 @@ void shm_nodes_set()
     TEST_ERROR;
 }
 
-double set_wait()
-{
+double set_wait(unsigned long max, unsigned long min){
     srand(time(NULL));
-    return rand() % (so_max_trans_gen_nsec - so_min_trans_gen_nsec + 1) + so_min_trans_gen_nsec;
+    return rand() % (max - min + 1) + min;
 }
 
 /*
  * It loads the file with the data
  */
-void load_file()
-{
+void load_file(){
     char load[25];
     my_f = fopen("master_data.txt", "r");
     if (my_f == NULL)

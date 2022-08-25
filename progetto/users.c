@@ -64,11 +64,11 @@ int random_receiver();
  */
 void handle_sig(int);
 
-int budget_ev();
+double budget_ev();
 
 int main(int argc, char *argv[]){
     struct timespec wait_next_trans;
-
+    int n;
 
     if (argc != 3){
         printf("Argument error\n");
@@ -138,7 +138,9 @@ int main(int argc, char *argv[]){
 
     while (try < so_retry){
         /*printf("making transaction\n");*/
-        try = try + transaction_data();
+        n = transaction_data();
+        try = try + n;
+        if(try >= 2) printf("try %d\n", try);
         wait_next_trans.tv_nsec = set_wait();
         nanosleep(&wait_next_trans, NULL);
     }
@@ -180,17 +182,24 @@ int random_receiver()
 }
 
 int transaction_data(){
-    int n, c = 0;
+    int n, node_pid;
+    double c = 0;
     c = budget_ev();
-    /*printf("budget calcolated %d\n", c);*/
-    /*printf("pid: %d - budget init= %d\n", getpid(), budget);*/
-    transaction_tot = trans_val(budget);
-    my_transaction.reward = transaction_tot * reward;
-    my_transaction.amount = transaction_tot - my_transaction.reward;
 
-    if(c == 0) budget -= transaction_tot;
-    else if(c > 0) budget = so_budget_init - c;
-    else budget = so_budget_init + c;
+    if(c == 1000) {
+        transaction_tot = trans_val(budget);
+        my_transaction.reward = transaction_tot * reward;
+        my_transaction.amount = transaction_tot - my_transaction.reward;
+        budget -= transaction_tot;
+    }else if(c >= 0){
+        budget = c;
+        transaction_tot = trans_val(budget);
+        my_transaction.reward = transaction_tot * reward;
+        my_transaction.amount = transaction_tot - my_transaction.reward;
+    }else{
+        exit(EXIT_FAILURE);
+    }
+
     budget_buf.msg_type = 1;
     budget_buf.pid = getpid();
     budget_buf.budget = budget;
@@ -198,6 +207,7 @@ int transaction_data(){
     kill(getppid(), SIGUSR2);
     if(budget < 2) return 1;
     else try = 0;
+
     do {
         n = random_receiver();
     }while (n == getpid());
@@ -215,27 +225,28 @@ int transaction_data(){
     close(trans_fd);
     sem_wait(user_sem);
 
-    printf("    timestamp: %f", (double)my_transaction.timestamp);
+    printf("    timestamp: %f - sender %d\n", (double)my_transaction.timestamp, my_transaction.sender);
     printf("    transaction sent: %d\n", transaction_tot);
     printf("    sent to: %d\n", my_transaction.receiver);
     printf("    transaction amount: %.2f\n    reward: %.2f\n", \
                 my_transaction.amount, my_transaction.reward);
-    printf("    sent to node: %d\n  new budget: %d\n", \
+    printf("    sent to node: %d\n  new budget: %.2f\n", \
                 pnodes_shm[rand() % so_nodes_num], budget);
     printf("--------------------------------------------\n");
-*/
-
-    transaction_to_send.msg_type = list_nodes[rand() % so_nodes_num];
+    sem_post(user_sem);*/
+    node_pid = list_nodes[rand() % so_nodes_num];
+    printf("send to node %d\n", node_pid);
+    transaction_to_send.msg_type = node_pid;
     transaction_to_send.message = my_transaction;
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
     TEST_ERROR;
     return 0;
 }
 
-int budget_ev(){
+double budget_ev(){
     int j;
     transaction temp;
-    int budget_temp = 0;
+    double budget_temp = so_budget_init;
 
     sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
@@ -255,6 +266,12 @@ int budget_ev(){
 void handle_sig(int signal){
     switch (signal) {
         case SIGINT:
+            budget_buf.msg_type = 1;
+            budget_buf.pid = getpid();
+            budget_buf.budget = budget;
+            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+            kill(getppid(), SIGUSR2);
+
             close(trans_fd);
             sem_close(nodes_sem);
             sem_close(user_sem);

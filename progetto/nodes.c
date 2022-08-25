@@ -130,7 +130,7 @@ int main(int argc, char *argv[]){
             budget_buf.budget = total_reward;
             msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
             sem_post(nodes_sem);*/
-            tp_len++;
+            printf("\n\n%d tp len = %d\n\n", getpid(), tp_len);
             trans_counter++;
         }else if(tp_len == SO_BLOCK_SIZE-1){
             clock_gettime(CLOCK_REALTIME, &stop);
@@ -178,13 +178,14 @@ int main(int argc, char *argv[]){
             budget_buf.msg_type = 2;
             budget_buf.pid = getpid();
             budget_buf.budget = total_reward;
-            printf("\n\ntotal reward to send %.2f\n", budget_buf.budget);
+            /*printf("\n\ntotal reward to send %.2f\n", budget_buf.budget);*/
             msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
             kill(getppid(), SIGUSR1);
-            sem_post(nodes_sem);
 
             tp_len = 0;
+            printf("\n\ntp a 0\n\n");
             my_reward = 0;
+            sem_post(nodes_sem);
         }
     }
 
@@ -202,6 +203,7 @@ int main(int argc, char *argv[]){
 void read_trans(){
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
     TEST_ERROR
+    tp_len++;
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
     total_reward = total_reward + my_transaction.reward;
@@ -214,7 +216,8 @@ void read_trans(){
     printf("    transaction amount: %.2f\n    reward: %.2f\n",
            my_transaction.amount, my_transaction.reward);
     printf("    sent to node: %d\n", getpid());
-    printf("--------------------------------------------\n");*/
+    printf("--------------------------------------------\n");
+    sem_post(nodes_sem);*/
     tp_block[tp_len] = my_transaction;
     /*printf("trans in position %d", my_tp.len);
     printf("trans read %d\n", my_tp.len);
@@ -234,12 +237,30 @@ void read_trans(){
 
 void handle_sig(int signal)
 {
-    switch (signal)
-    {
+    switch (signal){
     case SIGCONT:
         /*read_trans();*/
         break;
     case SIGINT:
+        sem_wait(nodes_sem);
+        printf("\ntransactions elaborated %d\n", trans_counter);
+        if(tp_len == 0) {
+            printf("\nnode %d has 0 transaction still in transaction_pool\n", getpid());
+        }
+        else {
+            printf("\nnode %d transaction still in transaction_pool\n\n", getpid());
+        }
+        for(i = 0; i < SO_BLOCK_SIZE; i++){/* could be til tp_len, to try | SO_BLOCK_SIZE */
+            printf("    timestamp: %f", (double)pmaster_book[mb_index.index][i].timestamp);
+            printf("    transaction sent: %.2f\n", pmaster_book[mb_index.index][i].amount + pmaster_book[mb_index.index][i].reward);
+            printf("    sent to: %d\n", pmaster_book[mb_index.index][i].receiver);
+            printf("    sent by: %d", pmaster_book[mb_index.index][i].sender);
+            printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        pmaster_book[mb_index.index][i].amount, pmaster_book[mb_index.index][i].reward);
+            printf("--------------------------------------------\n\n");
+        }
+        sem_post(nodes_sem);
+
         close(trans_fd);
         sem_close(nodes_sem);
         sem_close(user_sem);

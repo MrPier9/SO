@@ -99,6 +99,7 @@ int main()
     sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++){
         user_arr[i][0] = puser_shm[i];
+        user_arr[i][1] = 0;
         user_arr[i][2] = 0;
     }
     sem_post(user_sem);
@@ -111,15 +112,19 @@ int main()
     sem_post(nodes_sem);
 
     do{
-        for (i = 0; i < so_users_num; i++){
+        /*sem_wait(user_sem);*/
+        /*for (i = 0; i < so_users_num; i++){
             if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+            }else{
+                printf("non working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }
         }
         for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
-        printf("\n");
+        printf("\n");*/
+        /*sem_post(user_sem);*/
 
         /*sem_wait(nodes_sem);
         msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
@@ -172,7 +177,24 @@ int main()
     for (i = 0; i < so_nodes_num; i++){
         kill(nodes_arr[i][0], SIGINT);
     }
+    while(waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
+        if (errno == ECHILD) {
+            break;
+        }
+    }
 
+    printf("\n\nat ending simulation\n");
+    for (i = 0; i < so_users_num; i++){
+        if(user_arr[i][2] == 0) {
+            printf("user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+        }else{
+            printf("user %d already terminated with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+        }
+    }
+    for (i = 0; i < so_nodes_num; i++){
+        printf("nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
+    }
+    printf("\n");
 
     user_sem_del();
     nodes_sem_del();
@@ -274,6 +296,20 @@ void handle_sigint(int signal){
         {
             kill(pnodes_shm[i], SIGINT);
         }
+
+            printf("\n\nat ending simulation\n");
+            for (i = 0; i < so_users_num; i++){
+                if(user_arr[i][2] == 0) {
+                    printf("user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+                }else{
+                    printf("user %d already terminated with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+                }
+            }
+            for (i = 0; i < so_nodes_num; i++){
+                printf("nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
+            }
+            printf("\n");
+
             user_sem_del();
             nodes_sem_del();
             shmdt(puser_shm);

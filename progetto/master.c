@@ -20,6 +20,7 @@ pid_t pid;
 struct sigaction sa;
 struct sigaction sa_user;
 int user_done = 0;
+int master_index = 0;
 int (*user_arr)[3];
 int (*nodes_arr)[2];
 int msg_id;
@@ -140,7 +141,7 @@ int main(){
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
         printf("\n\nduration %d\n\n", duration);
-    } while (duration < so_sim_sec);
+    } while (duration < so_sim_sec && user_done < so_users_num && master_index < SO_REGISTRY_SIZE);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire
         if(errno == ECHILD){
@@ -191,8 +192,9 @@ int main(){
     msgctl(mb_index_id, IPC_RMID,NULL);
     msgctl(msg_id, IPC_RMID, NULL);
     msgctl(msg_budget_id, IPC_RMID, NULL);
-    printf("\n\n\nnormal ending simulation\n\n\n");
-    sleep(1);
+    if(user_done == so_users_num) printf("\n\n\nending simulation due to user\n\n\n");
+    else if(master_index == SO_REGISTRY_SIZE) printf("\n\n\nending simulation due to master book full\n\n\n");
+    else printf("\n\n\nending simulation due to time\n\n\n");
 
     return 0;
 }
@@ -270,6 +272,7 @@ int read_budget(int pid, int type){
     sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+    master_index = mb_index.index;
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             if(pmaster_book[i][j].receiver == pid){
@@ -348,6 +351,7 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
     for(i = 0; i < so_users_num; i++){
         if(user_arr[i][0] == si->si_pid) user_arr[i][2] = 1;
     }
+    user_done++;
 }
 
 

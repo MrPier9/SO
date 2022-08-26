@@ -148,12 +148,7 @@ int main(int argc, char *argv[]){
             }
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-            /*budget_buf.msg_type = 2;
-            budget_buf.pid = getpid();
-            budget_buf.budget = total_reward;
 
-            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
-            kill(getppid(), SIGUSR1);*/
             sem_post(nodes_sem);
             tp_len = 0;
 

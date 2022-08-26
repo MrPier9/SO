@@ -18,6 +18,7 @@
 
 pid_t pid;
 struct sigaction sa;
+struct sigaction sa_user;
 int user_done = 0;
 int (*user_arr)[3];
 int (*nodes_arr)[2];
@@ -34,8 +35,6 @@ struct msg_buf_mb{
 struct msg_buf_budget{
     long msg_type;
     int pid;
-    int terminated;
-    double budget;
 } budget_buf;
 
 /*
@@ -51,6 +50,7 @@ void make_nodes();
  * It handles the signal received from other processes
  */
 void handle_sigint(int);
+void handle_user_term(int, siginfo_t *, void *);
 /*
  * It calcolate the budget reading transaction from master_book.
  * First argument is for pid of user or node, the second to indicate which one is it
@@ -65,7 +65,10 @@ int main(){
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
     /*sigaction(SIGUSR1, &sa, NULL);*/
-    sigaction(SIGUSR2, &sa, NULL);
+    /*sigaction(SIGUSR2, &sa, NULL);*/
+    sa_user.sa_flags = SA_SIGINFO;
+    sa_user.sa_sigaction = &handle_user_term;
+    sigaction(SIGUSR2, &sa_user, 0);
 
     load_file();
     test_load_file();
@@ -73,9 +76,9 @@ int main(){
     nodes_sem_set(1);
     shm_user_set();
     shm_nodes_set();
-    msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
-    TEST_ERROR;
     mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);
+    TEST_ERROR
+    msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR;
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR
@@ -101,6 +104,7 @@ int main(){
 
     /*TEST_ERROR;*/
     sleep(1);
+
     for (i = 0; i < so_users_num; i++){
         user_arr[i][0] = puser_shm[i];
         user_arr[i][1] = 0;
@@ -112,9 +116,15 @@ int main(){
     }
 
     do{
+        sem_wait(nodes_sem);
+        msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+        msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+        sem_post(nodes_sem);
+
         for (i = 0; i < so_users_num; i++){
             user_arr[i][1] = read_budget(user_arr[i][0], 0);
             if(user_arr[i][2] == 0) {
+                user_arr[i][1] = read_budget(user_arr[i][0], 0);
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }else{
                 printf("non working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
@@ -178,8 +188,8 @@ int main(){
     shmdt(pmaster_book);
     shmctl(nodes_shm_id, IPC_RMID, NULL);
     shmctl(master_book_id, IPC_RMID, NULL);
-    msgctl(msg_id, IPC_RMID, NULL);
     msgctl(mb_index_id, IPC_RMID,NULL);
+    msgctl(msg_id, IPC_RMID, NULL);
     msgctl(msg_budget_id, IPC_RMID, NULL);
     printf("\n\n\nnormal ending simulation\n\n\n");
     sleep(1);
@@ -260,7 +270,6 @@ int read_budget(int pid, int type){
     sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-    printf("index %d\n", mb_index.index);
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             if(pmaster_book[i][j].receiver == pid){
@@ -274,6 +283,7 @@ int read_budget(int pid, int type){
     sem_post(nodes_sem);
     return pid_budget;
 }
+
 
 void handle_sigint(int signal){
     int i;
@@ -327,16 +337,17 @@ void handle_sigint(int signal){
         }
             printf("message rec 1\n");
         break;*/
-    case SIGUSR2:
-        msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 1, 0);
-        for (i = 0; i < so_users_num; i++){
-                if(user_arr[i][0] == budget_buf.pid) {
-                    if(budget_buf.terminated == 1) user_arr[i][2] = 1;
-                }
-        }
-        printf("message rec 2\n");
-        break;
     default:
         exit(EXIT_FAILURE);
     }
 }
+void handle_user_term(int signal, siginfo_t *si, void *data){
+    int i;
+    (void)signal;
+    (void)data;
+    for(i = 0; i < so_users_num; i++){
+        if(user_arr[i][0] == si->si_pid) user_arr[i][2] = 1;
+    }
+}
+
+

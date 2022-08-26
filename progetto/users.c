@@ -40,8 +40,6 @@ int msg_budget_id;
 struct msg_buf_budget{
     long msg_type;
     int pid;
-    int terminated;
-    double budget;
 } budget_buf;
 
 int *list_nodes, *list_user, i, l;
@@ -84,7 +82,6 @@ int main(int argc, char *argv[]){
     sa.sa_handler = &handle_sig;
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
-    budget_buf.terminated = 0;
     buffer_pre_book.list_index = 0;
 
     sleep(1);
@@ -152,13 +149,10 @@ int main(int argc, char *argv[]){
         wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec, so_min_trans_gen_nsec);
         nanosleep(&wait_next_trans, NULL);
     }
-    /*printf("ending %d\n", getpid());*/
 
-    budget_buf.msg_type = 1;
-    budget_buf.terminated = 1;
+    /*budget_buf.msg_type = 2;
     budget_buf.pid = getpid();
-    budget_buf.budget = budget;
-    msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
+    msgsnd(mb_index_id, &budget_buf, sizeof(budget_buf), 0);*/
     kill(getppid(), SIGUSR2);
 
     /*for(i = 0; i < buffer_pre_book.list_index; i++) {
@@ -172,7 +166,7 @@ int main(int argc, char *argv[]){
                printf("--------------------------------------------\n");
     }*/
 
-    /*printf("\ntot transaction made by %d - %d\n", getpid(), tot_trans + 1);*/
+    printf("\ntot transaction made by %d - %d - budget%.2f\n", getpid(), tot_trans + 1, budget);
     close(trans_fd);
     sem_close(nodes_sem);
     sem_close(user_sem);
@@ -260,10 +254,10 @@ double budget_ev(){
     double budget_temp = so_budget_init;
     /*printf("pre nodes sem\n");*/
     sem_wait(nodes_sem);
-    /*printf("post nodes sem\n");*/
+
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-    /*printf("pre for\n");*/
+    /*printf("user index %d\n", mb_index.index);*/
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             temp = pmaster_book[i][j];
@@ -294,7 +288,7 @@ double budget_ev(){
         budget_temp = budget_temp - (buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
         /*printf("calcolating budget after buffer\n");*/
     }
-    /*printf("%.2f", budget_temp);*/
+    /*printf("budget %.2f\n", budget_temp);*/
     sem_post(nodes_sem);
     /*printf("after sem post\n");*/
     return budget_temp;
@@ -303,13 +297,6 @@ double budget_ev(){
 void handle_sig(int signal){
     switch (signal) {
         case SIGINT:
-            budget_buf.msg_type = 1;
-            budget_buf.pid = getpid();
-            budget_buf.budget = budget;
-            msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
-            kill(getppid(), SIGUSR2);
-
-            printf("\ntot transaction made by %d - %d\n", getpid(), tot_trans);
 
             close(trans_fd);
             sem_close(nodes_sem);

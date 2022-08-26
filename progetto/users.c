@@ -44,9 +44,13 @@ struct msg_buf_budget{
     double budget;
 } budget_buf;
 
-int *list_nodes, *list_user, i;
+int *list_nodes, *list_user, i, l;
 struct timespec start, stop;
-int budget_init;
+
+struct transaction_buf{
+    transaction list[100];
+    int list_index;
+} buffer_pre_book;
 
 /*
  *It randomly calculate the value of the transaction
@@ -79,7 +83,8 @@ int main(int argc, char *argv[]){
     sigaction(SIGINT, &sa, NULL);
     sigaction(SIGUSR1, &sa, NULL);
     budget_buf.terminated = 0;
-    budget_init = so_budget_init;
+    buffer_pre_book.list_index = 0;
+
     sleep(1);
 
     load_file();
@@ -151,6 +156,17 @@ int main(int argc, char *argv[]){
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
 
+    /*for(i = 0; i < buffer_pre_book.list_index; i++) {
+        printf("--------------------------------------------\n");
+        printf("    timestamp: %f",  (double)buffer_pre_book.list[i].timestamp);
+        printf("    transaction sent: %.2f\n", buffer_pre_book.list[i].amount + buffer_pre_book.list[i].reward);
+        printf("    sent to: %d\n", buffer_pre_book.list[i].receiver);
+        printf("    sent by: %d", buffer_pre_book.list[i].sender);
+        printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                         buffer_pre_book.list[i].amount, buffer_pre_book.list[i].reward);
+               printf("--------------------------------------------\n");
+    }*/
+
     /*printf("\nuser %d terminating with retry %d and budget %.2f\n", getpid(), try, budget);*/
     close(trans_fd);
     sem_close(nodes_sem);
@@ -160,7 +176,6 @@ int main(int argc, char *argv[]){
     shmdt(pmaster_book);
     exit(0);
 
-    return 0;
 }
 
 int trans_val(int random_amount)
@@ -183,23 +198,14 @@ int random_receiver()
 
 int transaction_data(){
     int n, node_pid;
-    double c = 0;
-    c = budget_ev();
 
-    if(c == 1000) {
-        transaction_tot = trans_val(budget);
-        my_transaction.reward = transaction_tot * reward;
-        my_transaction.amount = transaction_tot - my_transaction.reward;
-        budget -= transaction_tot;
-    }else if(c >= 0){
-        budget = c;
-        transaction_tot = trans_val(budget);
-        my_transaction.reward = transaction_tot * reward;
-        my_transaction.amount = transaction_tot - my_transaction.reward;
-    }else{
-        exit(EXIT_FAILURE);
-    }
-
+    budget = budget_ev();
+    sem_wait(user_sem);
+    transaction_tot = trans_val(budget);
+    my_transaction.reward = transaction_tot * reward;
+    my_transaction.amount = transaction_tot - my_transaction.reward;
+    budget = budget - transaction_tot;
+    printf("%d transaction tot %d\nbudget %.2f\n", getpid(), transaction_tot, budget);
     budget_buf.msg_type = 1;
     budget_buf.pid = getpid();
     budget_buf.budget = budget;
@@ -217,6 +223,15 @@ int transaction_data(){
     TEST_ERROR;
     my_transaction.timestamp = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     my_transaction.sender = getpid();
+    printf("--------------------------------------------\n");
+    printf("    timestamp: %f",  (double)my_transaction.timestamp);
+    printf("    transaction sent: %.2f\n", my_transaction.amount + my_transaction.reward);
+    printf("    sent to: %d\n", my_transaction.receiver);
+    printf("    sent by: %d", my_transaction.sender);
+    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                         my_transaction.amount, my_transaction.reward);
+    printf("--------------------------------------------\n");
+    sem_post(user_sem);
 
     node_pid = list_nodes[rand() % so_nodes_num];
 
@@ -224,25 +239,57 @@ int transaction_data(){
     transaction_to_send.message = my_transaction;
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
     TEST_ERROR;
+    buffer_pre_book.list[buffer_pre_book.list_index] = my_transaction;
+    printf("--------------------------------------------\n");
+    printf("    timestamp: %f",  (double)buffer_pre_book.list[buffer_pre_book.list_index].timestamp);
+    printf("    transaction sent: %.2f\n", buffer_pre_book.list[buffer_pre_book.list_index].amount + buffer_pre_book.list[buffer_pre_book.list_index].reward);
+    printf("    sent to: %d\n", buffer_pre_book.list[buffer_pre_book.list_index].receiver);
+    printf("    sent by: %d", buffer_pre_book.list[buffer_pre_book.list_index].sender);
+    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                         buffer_pre_book.list[buffer_pre_book.list_index].amount, buffer_pre_book.list[buffer_pre_book.list_index].reward);
+    printf("--------------------------------------------\n");
+    buffer_pre_book.list_index++;
     return 0;
 }
 
 double budget_ev(){
-    int j;
+    int j, k, l;
     transaction temp;
-    double budget_temp = budget_init;
+    double budget_temp = so_budget_init;
 
     sem_wait(nodes_sem);
+    printf("%d budget temp 0 - %.2f\n", getpid(),budget_temp);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             temp = pmaster_book[i][j];
             if(temp.receiver == getpid()) budget_temp = budget_temp + temp.amount;
             if(temp.sender == getpid()) budget_temp = budget_temp - (temp.amount + temp.reward);
+            for(k = 0; k < buffer_pre_book.list_index; k++){
+                if(temp.sender == getpid() && temp.amount == buffer_pre_book.list[k].amount && temp.receiver == buffer_pre_book.list[k].receiver){
+                    printf("--------------------transaction eliminated from buf------------------------\n");
+                    printf("    timestamp: %f",  (double)buffer_pre_book.list[k].timestamp);
+                    printf("    transaction sent: %.2f\n", buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
+                    printf("    sent to: %d\n", buffer_pre_book.list[k].receiver);
+                    printf("    sent by: %d", buffer_pre_book.list[k].sender);
+                    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                         buffer_pre_book.list[k].amount, buffer_pre_book.list[k].reward);
+                    printf("--------------------------------------------\n");
+                    for(l = k ; l < buffer_pre_book.list_index - 1; l++){
+                        buffer_pre_book.list[k] = buffer_pre_book.list[k + 1];
+                    }
+                    buffer_pre_book.list_index--;
+                }
+            }
         }
     }
+    printf("budget temp 1 = %.2f\n", budget_temp);
+    for(k = 0; k < buffer_pre_book.list_index; k++){
+        budget_temp = budget_temp - (buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
+    }
+    printf("budget temp 2 = %.2f\n", budget_temp);
+    printf("%d budget temp finale - %.2f\n", getpid(),budget_temp);
     sem_post(nodes_sem);
     return budget_temp;
 }
@@ -266,10 +313,15 @@ void handle_sig(int signal){
 
         case SIGUSR1:
             msgrcv(msg_id, &transaction_rejected, sizeof(transaction_rejected), 1, 0);
-            budget_init = transaction_rejected.message.amount + transaction_rejected.message.reward;
-            /*to fix evaluation budget because user must count transaction not yet in master book
-             * could be an option to make a buffer to empty when a transaction is read by user
-             */
+            for(i = 0; i < buffer_pre_book.list_index; i++){
+                if(transaction_rejected.message.timestamp == buffer_pre_book.list[i].timestamp &&
+                    transaction_rejected.message.sender == buffer_pre_book.list[i].sender){
+                    for(l = i ; l < buffer_pre_book.list_index - 1; l++){
+                        buffer_pre_book.list[i] = buffer_pre_book.list[i + 1];
+                    }
+                    buffer_pre_book.list_index--;
+                }
+            }
             break;
         default:
             break;

@@ -111,7 +111,7 @@ int main(){
 
     do{
         /*sem_wait(user_sem);*/
-        for (i = 0; i < so_users_num; i++){
+        /*for (i = 0; i < so_users_num; i++){
             if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }else{
@@ -121,7 +121,7 @@ int main(){
         for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
-        printf("\n");
+        printf("\n");*/
         /*sem_post(user_sem);*/
 
         /*sem_wait(nodes_sem);

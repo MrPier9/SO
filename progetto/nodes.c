@@ -168,15 +168,6 @@ int main(int argc, char *argv[]){
         kill(transaction_rec.message.sender, SIGUSR1);
     }
 
-    close(trans_fd);
-    sem_close(nodes_sem);
-    sem_close(user_sem);
-    shmdt(puser_shm);
-    shmdt(pnodes_shm);
-    shmdt(pmaster_book);
-    exit(0);
-
-    return 0;
 }
 
 void read_trans(){

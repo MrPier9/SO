@@ -64,7 +64,7 @@ int main(){
 
     sa.sa_handler = &handle_sigint;
     sigaction(SIGINT, &sa, NULL);
-    sigaction(SIGUSR1, &sa, NULL);
+    /*sigaction(SIGUSR1, &sa, NULL);*/
     sigaction(SIGUSR2, &sa, NULL);
 
     load_file();
@@ -260,6 +260,7 @@ int read_budget(int pid, int type){
     sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+    printf("index %d\n", mb_index.index);
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             if(pmaster_book[i][j].receiver == pid){
@@ -276,8 +277,7 @@ int read_budget(int pid, int type){
 
 void handle_sigint(int signal){
     int i;
-    switch (signal)
-    {
+    switch (signal){
     case SIGINT:
         for (i = 0; i < so_users_num; i++)
         {
@@ -326,17 +326,16 @@ void handle_sigint(int signal){
             }
         }
             printf("message rec 1\n");
-        break;
+        break;*/
     case SIGUSR2:
         msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 1, 0);
         for (i = 0; i < so_users_num; i++){
                 if(user_arr[i][0] == budget_buf.pid) {
-                    user_arr[i][1] = budget_buf.budget;
                     if(budget_buf.terminated == 1) user_arr[i][2] = 1;
                 }
         }
         printf("message rec 2\n");
-        break;*/
+        break;
     default:
         exit(EXIT_FAILURE);
     }

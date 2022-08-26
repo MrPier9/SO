@@ -147,12 +147,12 @@ int main(int argc, char *argv[]){
     while (try < so_retry){
         n = transaction_data();
         try = try + n;
-        if(try >= 1) printf("%d try = %d\n",getpid(), try);
+        /*if(try >= 1) printf("%d try = %d\n",getpid(), try);*/
         tot_trans++;
         wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec, so_min_trans_gen_nsec);
         nanosleep(&wait_next_trans, NULL);
     }
-    printf("ending %d\n", getpid());
+    /*printf("ending %d\n", getpid());*/
 
     budget_buf.msg_type = 1;
     budget_buf.terminated = 1;
@@ -172,7 +172,7 @@ int main(int argc, char *argv[]){
                printf("--------------------------------------------\n");
     }*/
 
-    printf("\ntot transaction made by %d - %d\n", getpid(), tot_trans + 1);
+    /*printf("\ntot transaction made by %d - %d\n", getpid(), tot_trans + 1);*/
     close(trans_fd);
     sem_close(nodes_sem);
     sem_close(user_sem);

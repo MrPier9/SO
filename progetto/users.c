@@ -213,12 +213,12 @@ int transaction_data(){
     my_transaction.reward = transaction_tot * reward;
     my_transaction.amount = transaction_tot - my_transaction.reward;
 
-    /*printf("budget %.2f\n", budget);*/
+    /*printf("budget %.2f\n", budget);
     budget_buf.msg_type = 1;
     budget_buf.pid = getpid();
     budget_buf.budget = budget;
     msgsnd(msg_budget_id, &budget_buf, sizeof(budget_buf), 0);
-    kill(getppid(), SIGUSR2);
+    kill(getppid(), SIGUSR2);*/
     if(budget < 2) return 1;
     else try = 0;
     /*printf("budget > 2\n");*/

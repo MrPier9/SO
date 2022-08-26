@@ -51,6 +51,13 @@ void make_nodes();
  * It handles the signal received from other processes
  */
 void handle_sigint(int);
+/*
+ * It calcolate the budget reading transaction from master_book.
+ * First argument is for pid of user or node, the second to indicate which one is it
+ * 0 for user
+ * 1 for node
+ */
+int read_budget(int, int);
 
 int main(){
     int i, duration;
@@ -105,8 +112,8 @@ int main(){
     }
 
     do{
-        /*sem_wait(user_sem);*/
         for (i = 0; i < so_users_num; i++){
+            user_arr[i][1] = read_budget(user_arr[i][0], 0);
             if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }else{
@@ -114,41 +121,15 @@ int main(){
             }
         }
         for (i = 0; i < so_nodes_num; i++){
+            nodes_arr[i][1] = read_budget(nodes_arr[i][0], 1);
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
         printf("\n");
-        /*sem_post(user_sem);*/
 
-        /*sem_wait(nodes_sem);
-        msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-        msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-        printf("\nmaster: index %d\n", mb_index.index);
-        for(i = 0; i < mb_index.index; i++){
-            for(j = 0; j < SO_BLOCK_SIZE; j++){
-                printf("[%d][%d]\n", i,j);
-                printf("    timestamp: %f", (double)pmaster_book[i][j].timestamp);
-                printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
-                printf("    sent to: %d\n", pmaster_book[i][j].receiver);
-                printf("    sent by: %d", pmaster_book[i][j].sender);
-                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        pmaster_book[i][j].amount, pmaster_book[i][j].reward);
-                printf("--------------------------------------------\n");
-            }
-            printf("\n");
-        }
-        sem_post(nodes_sem);*/
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
         printf("\n\nduration %d\n\n", duration);
-        /*for (i = 0; i < so_users_num; i++)
-        {
-            kill(user_arr[i], SIGCONT);
-        }
-        for (i = 0; i < so_nodes_num; i++)
-        {
-            kill(nodes_arr[i], SIGCONT);
-        }*/
     } while (duration < so_sim_sec);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire
@@ -271,6 +252,28 @@ void make_nodes()
     }
 }
 
+int read_budget(int pid, int type){
+    int i, j, pid_budget;
+    if(type == 0)  pid_budget = so_budget_init;
+    else pid_budget = 0;
+
+    sem_wait(nodes_sem);
+    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+    for(i = 0; i < mb_index.index; i++){
+        for(j = 0; j < SO_BLOCK_SIZE; j++) {
+            if(pmaster_book[i][j].receiver == pid){
+                pid_budget = pmaster_book[i][j].amount + pid_budget;
+            }
+            if(pmaster_book[i][j].sender == pid){
+                pid_budget =  pid_budget - (pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+            }
+        }
+    }
+    sem_post(nodes_sem);
+    return pid_budget;
+}
+
 void handle_sigint(int signal){
     int i;
     switch (signal)
@@ -315,7 +318,7 @@ void handle_sigint(int signal){
 
         exit(0);
         break;
-    case SIGUSR1:
+    /*case SIGUSR1:
         msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 2, 0);
         for (i = 0; i < so_nodes_num; i++){
             if(nodes_arr[i][0] == budget_buf.pid) {
@@ -333,7 +336,7 @@ void handle_sigint(int signal){
                 }
         }
         printf("message rec 2\n");
-        break;
+        break;*/
     default:
         exit(EXIT_FAILURE);
     }

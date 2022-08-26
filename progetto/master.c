@@ -94,24 +94,19 @@ int main(){
 
     /*TEST_ERROR;*/
     sleep(1);
-    sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++){
         user_arr[i][0] = puser_shm[i];
         user_arr[i][1] = 0;
         user_arr[i][2] = 0;
     }
-    sem_post(user_sem);
-
-    sem_wait(nodes_sem);
     for (i = 0; i < so_nodes_num; i++){
         nodes_arr[i][0] = pnodes_shm[i];
         nodes_arr[i][1] = 0;
     }
-    sem_post(nodes_sem);
 
     do{
         /*sem_wait(user_sem);*/
-        /*for (i = 0; i < so_users_num; i++){
+        for (i = 0; i < so_users_num; i++){
             if(user_arr[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
             }else{
@@ -121,7 +116,7 @@ int main(){
         for (i = 0; i < so_nodes_num; i++){
             printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
         }
-        printf("\n");*/
+        printf("\n");
         /*sem_post(user_sem);*/
 
         /*sem_wait(nodes_sem);
@@ -145,7 +140,7 @@ int main(){
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
-        printf("duration %d\n", duration);
+        printf("\n\nduration %d\n\n", duration);
         /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGCONT);
@@ -327,6 +322,7 @@ void handle_sigint(int signal){
                 nodes_arr[i][1] = budget_buf.budget;
             }
         }
+            printf("message rec 1\n");
         break;
     case SIGUSR2:
         msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 1, 0);
@@ -336,6 +332,7 @@ void handle_sigint(int signal){
                     if(budget_buf.terminated == 1) user_arr[i][2] = 1;
                 }
         }
+        printf("message rec 2\n");
         break;
     default:
         exit(EXIT_FAILURE);

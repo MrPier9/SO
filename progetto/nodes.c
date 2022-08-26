@@ -156,7 +156,7 @@ int main(int argc, char *argv[]){
             kill(getppid(), SIGUSR1);
             sem_post(nodes_sem);
             tp_len = 0;
-            printf("\n\ntp a 0\n\n");
+
             my_reward = 0;
         }
     }

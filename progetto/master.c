@@ -145,7 +145,7 @@ int main(){
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
-        /*printf("duration %d\n", duration);*/
+        printf("duration %d\n", duration);
         /*for (i = 0; i < so_users_num; i++)
         {
             kill(user_arr[i], SIGCONT);

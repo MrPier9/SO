@@ -23,8 +23,8 @@
 #define TRANSACTION_FIFO "trans_fifo"
 #define BILLION 1000000000L
 #define MAX 1024
-#define SO_REGISTRY_SIZE 1000
-#define SO_BLOCK_SIZE 25
+#define SO_REGISTRY_SIZE 100
+#define SO_BLOCK_SIZE 10
 
 typedef struct{
     double timestamp;

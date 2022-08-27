@@ -173,7 +173,7 @@ int random_receiver(){
 }
 
 int transaction_data(){
-    int n, node_pid, counter = 0;
+    int n, node_pid, counter;
 
     budget = budget_ev();
 
@@ -184,6 +184,7 @@ int transaction_data(){
     if(budget < 2) return 1;
     else try = 0;
 
+    counter = 0;
     do {
         n = random_receiver();
         counter++;
@@ -214,10 +215,12 @@ double budget_ev(){
     int j, k, l;
     transaction temp;
     double budget_temp = so_budget_init;
-
+    printf("pre wait in budget ev\n");
     sem_wait(nodes_sem);
+    printf("reding message in budget ev\n");
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+    printf("message rec in budget ev\n");
     for(i = 0; i < mb_index.index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             temp = pmaster_book[i][j];
@@ -234,13 +237,13 @@ double budget_ev(){
             }
         }
     }
-
+    printf("post reading master book\n");
     for(k = 0; k < buffer_pre_book.list_index; k++){
         budget_temp = budget_temp - (buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
     }
-
+    printf("post budget cal in budget ev\n");
     sem_post(nodes_sem);
-
+    printf("post sem post in budget ev\n");
     return budget_temp;
 }
 

@@ -63,13 +63,14 @@ int read_budget(int, int);
 int main(){
     int i, duration;
 
-    sa.sa_handler = &handle_sigint;
-    sigaction(SIGINT, &sa, NULL);
+    /*sa.sa_handler = &handle_sigint;
+    sigaction(SIGINT, &sa, NULL);*/
     /*sigaction(SIGUSR1, &sa, NULL);*/
     /*sigaction(SIGUSR2, &sa, NULL);*/
     sa_user.sa_flags = SA_SIGINFO;
     sa_user.sa_sigaction = &handle_user_term;
     sigaction(SIGUSR2, &sa_user, 0);
+    sigaction(SIGINT, &sa_user, NULL);
 
     load_file();
     test_load_file();
@@ -117,10 +118,12 @@ int main(){
     sem_post(nodes_sem);
 
     do{
+        printf("pre wait\n");
         sem_wait(nodes_sem);
+        printf("post wait\n");
         msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
         msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-
+        printf("index read\n");
         for (i = 0; i < so_users_num; i++){
             puser_shm[i][1] = read_budget(puser_shm[i][0], 0);
             if(puser_shm[i][2] == 0) {
@@ -140,7 +143,7 @@ int main(){
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
         printf("\n\nduration %d\n\n", duration);
-    } while (duration < so_sim_sec && user_done < so_users_num && master_index < SO_REGISTRY_SIZE);
+    } while (duration < so_sim_sec && user_done < so_users_num-1 && master_index < SO_REGISTRY_SIZE);
 
     /*while(waitpid(-1, NULL, 0)){ master aspetta per ogni user di finire
         if(errno == ECHILD){
@@ -339,14 +342,63 @@ void handle_sigint(int signal){
 }
 void handle_user_term(int signal, siginfo_t *si, void *data){
     int i;
-    (void)signal;
-    (void)data;
-    for(i = 0; i < so_users_num; i++){
-        if(puser_shm[i][0] == si->si_pid) {
-            puser_shm[i][2] = 1;
-        }
+
+    switch (signal) {
+        case SIGINT:
+            for (i = 0; i < so_users_num; i++) {
+                kill(puser_shm[i][0], SIGINT);
+            }
+            for (i = 0; i < so_nodes_num; i++) {
+                kill(pnodes_shm[i][0], SIGINT);
+            }
+
+            while (waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
+                if (errno == ECHILD) {
+                    break;
+                }
+            }
+
+            printf("\n\nat ending simulation\n");
+            for (i = 0; i < so_users_num; i++) {
+                if (puser_shm[i][2] == 0) {
+                    printf("user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
+                } else {
+                    printf("user %d already terminated with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
+                }
+            }
+            for (i = 0; i < so_nodes_num; i++) {
+                printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
+            }
+            printf("\n");
+
+            user_sem_del();
+            nodes_sem_del();
+            shmdt(puser_shm);
+            shmctl(users_shm_id, IPC_RMID, NULL);
+            shmdt(pnodes_shm);
+            shmdt(pmaster_book);
+            shmctl(nodes_shm_id, IPC_RMID, NULL);
+            shmctl(master_book_id, IPC_RMID, NULL);
+            msgctl(msg_id, IPC_RMID, NULL);
+            msgctl(mb_index_id, IPC_RMID, NULL);
+            msgctl(msg_budget_id, IPC_RMID, NULL);
+            printf("\n\n\nforced ending simulation...\n\n\n");
+            sleep(1);
+
+            exit(0);
+        case SIGUSR2:
+            (void) signal;
+            (void) data;
+            for (i = 0; i < so_users_num; i++) {
+                if (puser_shm[i][0] == si->si_pid) {
+                    puser_shm[i][2] = 1;
+                }
+            }
+            user_done++;
+            break;
+        default:
+            exit(EXIT_FAILURE);
     }
-    user_done++;
 }
 
 

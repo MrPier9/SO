@@ -135,10 +135,13 @@ int main(int argc, char *argv[]){
             wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
             nanosleep(&wait_writing_mb, NULL);
 
-            sem_wait(nodes_sem);
             msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+            printf("message rec in node\n");
+            printf("pre wait node\n");
+            sem_wait(nodes_sem);
+            printf("post wait in node\n");
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
-
+            printf("reading master book\n");
                 pmaster_book[mb_index.index][i] = tp_block[i];
                 tp_block[i].reward = 0;
                 tp_block[i].amount = 0;
@@ -147,8 +150,11 @@ int main(int argc, char *argv[]){
                 tp_block[i].receiver = 0;
             }
             mb_index.index++;
+            printf("pre sending index\n");
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
+            printf("pre sem post node\n");
             sem_post(nodes_sem);
+            printf("post sem post in node\n");
 
             tp_len = 0;
             my_reward = 0;
@@ -165,7 +171,9 @@ int main(int argc, char *argv[]){
 }
 
 void read_trans(){
+    printf("pre trans rec\n");
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
+    printf("trans rec\n");
     TEST_ERROR
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
@@ -181,7 +189,7 @@ void handle_sig(int signal)
     switch (signal){
     case SIGINT:
 
-        sem_wait(nodes_sem);
+        sem_wait(user_sem);
         printf("\n\nnode %d\n", getpid());
         printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
         printf("--------------------------------------------\n");
@@ -194,7 +202,7 @@ void handle_sig(int signal)
                         tp_block[i].amount, tp_block[i].reward);
             printf("--------------------------------------------\n");
         }
-        sem_post(nodes_sem);
+        sem_post(user_sem);
 
         close(trans_fd);
         sem_close(nodes_sem);

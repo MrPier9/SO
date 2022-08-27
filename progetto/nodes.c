@@ -68,7 +68,6 @@ int main(int argc, char *argv[]){
     }
 
     sa.sa_handler = &handle_sig;
-    sigaction(SIGCONT, &sa, NULL);
     sigaction(SIGINT, &sa, NULL);
 
     wait_next_trans.tv_sec = 0;
@@ -78,15 +77,15 @@ int main(int argc, char *argv[]){
     load_file();
     tp_len = 0;
 
-    users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, 0666);
-    TEST_ERROR;
+    users_shm_id = shmget(SHM_USERS_KEY, sizeof(puser_shm) * so_users_num, 0666);
+    TEST_ERROR
     puser_shm = shmat(users_shm_id, NULL, 0);
-    TEST_ERROR;
+    TEST_ERROR
 
-    nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(int) * so_nodes_num, 0666);
-    TEST_ERROR;
+    nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(pnodes_shm) * so_nodes_num, 0666);
+    TEST_ERROR
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
-    TEST_ERROR;
+    TEST_ERROR
 
     master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, 0666);
     TEST_ERROR
@@ -94,21 +93,21 @@ int main(int argc, char *argv[]){
     TEST_ERROR
 
     user_sem = sem_open(SNAME, O_RDWR);
-    TEST_ERROR;
+    TEST_ERROR
     nodes_sem = sem_open(SNAME_N, O_RDWR);
-    TEST_ERROR;
+    TEST_ERROR
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
-    TEST_ERROR;
+    TEST_ERROR
     mb_index_id = msgget(MSG_INDEX_KEY, 0666);
     TEST_ERROR
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
     TEST_ERROR
 
-    list_user = malloc(sizeof(int)*so_users_num);
-    list_nodes = malloc(sizeof(int) * so_nodes_num);
-
     wait_writing_mb.tv_sec = 0;
+
+    /*list_user = malloc(sizeof(int)*so_users_num);
+    list_nodes = malloc(sizeof(int) * so_nodes_num);
 
     for(i = 0; i < so_users_num; i++){
         list_user[i] = puser_shm[i];
@@ -117,10 +116,10 @@ int main(int argc, char *argv[]){
         list_nodes[i] = pnodes_shm[i];
     }
     shmdt(puser_shm);
-    shmdt(pnodes_shm);
+    shmdt(pnodes_shm);*/
 
     while (trans_counter < so_tp_size){
-        /*printf("trans counter %d: %d\n", getpid(), trans_counter);*/
+
         if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
             trans_counter++;
@@ -135,11 +134,12 @@ int main(int argc, char *argv[]){
 
             wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
             nanosleep(&wait_writing_mb, NULL);
+
             sem_wait(nodes_sem);
             msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
-                pmaster_book[mb_index.index][i] = tp_block[i];
 
+                pmaster_book[mb_index.index][i] = tp_block[i];
                 tp_block[i].reward = 0;
                 tp_block[i].amount = 0;
                 tp_block[i].sender = 0;
@@ -148,10 +148,9 @@ int main(int argc, char *argv[]){
             }
             mb_index.index++;
             msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-
             sem_post(nodes_sem);
-            tp_len = 0;
 
+            tp_len = 0;
             my_reward = 0;
         }
     }
@@ -180,12 +179,9 @@ void read_trans(){
 void handle_sig(int signal)
 {
     switch (signal){
-    case SIGCONT:
-        /*read_trans();*/
-        break;
     case SIGINT:
-        sem_wait(nodes_sem);
 
+        sem_wait(nodes_sem);
         printf("\n\nnode %d\n", getpid());
         printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
         printf("--------------------------------------------\n");

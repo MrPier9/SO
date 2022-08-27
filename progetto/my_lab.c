@@ -43,7 +43,7 @@ void nodes_sem_del(){
 }
 
 void shm_user_set(){
-    users_shm_id = shmget(SHM_USERS_KEY, sizeof(int) * so_users_num, IPC_CREAT | 0666);
+    users_shm_id = shmget(SHM_USERS_KEY, sizeof(puser_shm) * so_users_num, IPC_CREAT | 0666);
     TEST_ERROR;
     puser_shm = shmat(users_shm_id, NULL, 0);
     TEST_ERROR;
@@ -51,7 +51,7 @@ void shm_user_set(){
 
 void shm_nodes_set()
 {
-    nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(int) * so_nodes_num, IPC_CREAT | 0666);
+    nodes_shm_id = shmget(SHM_NODES_KEY, sizeof(pnodes_shm) * so_nodes_num, IPC_CREAT | 0666);
     TEST_ERROR;
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
     TEST_ERROR;

@@ -44,9 +44,9 @@ sem_t *nodes_sem;
 
 FILE *my_f;
 int users_shm_id;
-int *puser_shm;
+int (*puser_shm)[3];
 int nodes_shm_id;
-int *pnodes_shm;
+int (*pnodes_shm)[2];
 int master_book_id;
 transaction (*pmaster_book)[SO_REGISTRY_SIZE]/*[SO_BLOCK_SIZE]*/;
 transaction master_book_page[SO_BLOCK_SIZE];

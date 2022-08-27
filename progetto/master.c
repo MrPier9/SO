@@ -21,8 +21,8 @@ struct sigaction sa;
 struct sigaction sa_user;
 int user_done = 0;
 int master_index = 0;
-int (*user_arr)[3];
-int (*nodes_arr)[2];
+/*int (*user_arr)[3];
+int (*nodes_arr)[2];*/
 int msg_id;
 int mb_index_id;
 int msg_budget_id;
@@ -89,8 +89,8 @@ int main(){
     pmaster_book = shmat(master_book_id, NULL, 0);
     TEST_ERROR;
 
-    nodes_arr = malloc(sizeof(nodes_arr) * so_nodes_num);
-    user_arr = malloc(sizeof(user_arr) * so_users_num);
+    /*nodes_arr = malloc(sizeof(nodes_arr) * so_nodes_num);
+    user_arr = malloc(sizeof(user_arr) * so_users_num);*/
 
 
     mb_index.msg_type = 1;
@@ -106,35 +106,34 @@ int main(){
     /*TEST_ERROR;*/
     sleep(1);
 
+    sem_wait(nodes_sem);
     for (i = 0; i < so_users_num; i++){
-        user_arr[i][0] = puser_shm[i];
-        user_arr[i][1] = 0;
-        user_arr[i][2] = 0;
+        puser_shm[i][1] = 0;
+        puser_shm[i][2] = 0;
     }
     for (i = 0; i < so_nodes_num; i++){
-        nodes_arr[i][0] = pnodes_shm[i];
-        nodes_arr[i][1] = 0;
+        pnodes_shm[i][1] = 0;
     }
+    sem_post(nodes_sem);
 
     do{
         sem_wait(nodes_sem);
         msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
         msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-        sem_post(nodes_sem);
 
         for (i = 0; i < so_users_num; i++){
-            user_arr[i][1] = read_budget(user_arr[i][0], 0);
-            if(user_arr[i][2] == 0) {
-                user_arr[i][1] = read_budget(user_arr[i][0], 0);
-                printf("working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+            puser_shm[i][1] = read_budget(puser_shm[i][0], 0);
+            if(puser_shm[i][2] == 0) {
+                printf("working user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
             }else{
-                printf("non working user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+                printf("non working user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
             }
         }
         for (i = 0; i < so_nodes_num; i++){
-            nodes_arr[i][1] = read_budget(nodes_arr[i][0], 1);
-            printf("working nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
+            pnodes_shm[i][1] = read_budget(pnodes_shm[i][0], 1);
+            printf("working nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
         }
+        sem_post(nodes_sem);
         printf("\n");
 
         sleep(1);
@@ -157,10 +156,10 @@ int main(){
         printf("nodes pid n:%d - %d\n", i + 1, pnodes_shm[i]);
     }*/
     for (i = 0; i < so_users_num; i++){
-        kill(user_arr[i][0], SIGINT);
+        kill(puser_shm[i][0], SIGINT);
     }
     for (i = 0; i < so_nodes_num; i++){
-        kill(nodes_arr[i][0], SIGINT);
+        kill(pnodes_shm[i][0], SIGINT);
     }
     while(waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
         if (errno == ECHILD) {
@@ -170,15 +169,17 @@ int main(){
 
     printf("\n\n        at ending simulation\n");
     for (i = 0; i < so_users_num; i++){
-        if(user_arr[i][2] == 0) {
-            printf("user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+        if(puser_shm[i][2] == 0) {
+            printf("user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
         }else{
-            printf("user %d already terminated with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+            printf("user %d already terminated with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
         }
     }
     for (i = 0; i < so_nodes_num; i++){
-        printf("nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
+        printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
     }
+    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+    printf("number of blocks in master book - %d\n", mb_index.index);
     printf("\n");
 
     user_sem_del();
@@ -224,7 +225,7 @@ void make_users(){
             exit(EXIT_FAILURE);
         }
         else if (pid == 0){
-            puser_shm[i] = getpid();
+            puser_shm[i][0] = getpid();
             execve(USER_PATH, args_user, NULL);
             TEST_ERROR;
         }
@@ -257,7 +258,7 @@ void make_nodes()
         }
         else if (pid == 0)
         {
-            pnodes_shm[i] = getpid();
+            pnodes_shm[i][0] = getpid();
             execve(NODES_PATH, args_nodes, NULL);
             TEST_ERROR
         }
@@ -269,11 +270,10 @@ int read_budget(int pid, int type){
     if(type == 0)  pid_budget = so_budget_init;
     else pid_budget = 0;
 
-    sem_wait(nodes_sem);
     msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
     msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
     master_index = mb_index.index;
-    for(i = 0; i < mb_index.index; i++){
+    for(i = 0; i < master_index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             if(pmaster_book[i][j].receiver == pid){
                 pid_budget = pmaster_book[i][j].amount + pid_budget;
@@ -283,7 +283,7 @@ int read_budget(int pid, int type){
             }
         }
     }
-    sem_post(nodes_sem);
+
     return pid_budget;
 }
 
@@ -292,25 +292,29 @@ void handle_sigint(int signal){
     int i;
     switch (signal){
     case SIGINT:
-        for (i = 0; i < so_users_num; i++)
-        {
-            kill(puser_shm[i], SIGINT);
+        for (i = 0; i < so_users_num; i++){
+            kill(puser_shm[i][0], SIGINT);
         }
-        for (i = 0; i < so_nodes_num; i++)
-        {
-            kill(pnodes_shm[i], SIGINT);
+        for (i = 0; i < so_nodes_num; i++){
+            kill(pnodes_shm[i][0], SIGINT);
         }
 
-            printf("\n\nat ending simulation\n");
-            for (i = 0; i < so_users_num; i++){
-                if(user_arr[i][2] == 0) {
-                    printf("user %d with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
-                }else{
-                    printf("user %d already terminated with budget %d\n", (int) user_arr[i][0], user_arr[i][1]);
+        while(waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
+            if (errno == ECHILD) {
+                break;
+            }
+        }
+
+        printf("\n\nat ending simulation\n");
+        for (i = 0; i < so_users_num; i++){
+            if(puser_shm[i][2] == 0) {
+                printf("user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
+            }else{
+                printf("user %d already terminated with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
                 }
             }
             for (i = 0; i < so_nodes_num; i++){
-                printf("nodes %d with budget %d\n", nodes_arr[i][0], nodes_arr[i][1]);
+                printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
             }
             printf("\n");
 
@@ -330,16 +334,6 @@ void handle_sigint(int signal){
         sleep(1);
 
         exit(0);
-        break;
-    /*case SIGUSR1:
-        msgrcv(msg_budget_id, &budget_buf, sizeof(budget_buf), 2, 0);
-        for (i = 0; i < so_nodes_num; i++){
-            if(nodes_arr[i][0] == budget_buf.pid) {
-                nodes_arr[i][1] = budget_buf.budget;
-            }
-        }
-            printf("message rec 1\n");
-        break;*/
     default:
         exit(EXIT_FAILURE);
     }
@@ -349,7 +343,9 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
     (void)signal;
     (void)data;
     for(i = 0; i < so_users_num; i++){
-        if(user_arr[i][0] == si->si_pid) user_arr[i][2] = 1;
+        if(puser_shm[i][0] == si->si_pid) {
+            puser_shm[i][2] = 1;
+        }
     }
     user_done++;
 }

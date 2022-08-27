@@ -23,6 +23,7 @@ transaction my_transaction;
 int trans_fd;
 int try = 0;
 struct sigaction sa;
+int master_index;
 
 int msg_id;
 struct msg_buf{
@@ -114,22 +115,10 @@ int main(int argc, char *argv[]){
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR;
-    mb_index_id = msgget(MSG_INDEX_KEY, 0666);
-    TEST_ERROR
+    /*mb_index_id = msgget(MSG_INDEX_KEY, 0666);
+    TEST_ERROR*/
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
     TEST_ERROR
-
-    /*list_nodes = malloc(sizeof(int) * so_nodes_num);
-    list_user = malloc(sizeof(int) * so_users_num);
-
-    for(i = 0; i < so_users_num; i++){
-        list_user[i] = puser_shm[i];
-    }
-    for(i = 0; i < so_nodes_num; i++){
-        list_nodes[i] = pnodes_shm[i];
-    }
-    shmdt(puser_shm);
-    shmdt(pnodes_shm);*/
 
     wait_next_trans.tv_sec = 0;
     budget = so_budget_init;
@@ -202,9 +191,10 @@ int transaction_data(){
 
     transaction_to_send.msg_type = node_pid;
     transaction_to_send.message = my_transaction;
+    printf("user - sending trans\n");
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
     TEST_ERROR
-
+    printf("user - trans sent\n");
     buffer_pre_book.list[buffer_pre_book.list_index] = my_transaction;
     buffer_pre_book.list_index++;
 
@@ -215,17 +205,21 @@ double budget_ev(){
     int j, k, l;
     transaction temp;
     double budget_temp = so_budget_init;
-    printf("pre wait in budget ev\n");
     sem_wait(nodes_sem);
-    printf("reding message in budget ev\n");
-    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-    printf("message rec in budget ev\n");
-    for(i = 0; i < mb_index.index; i++){
+    printf("user %d - preusing masterbook\n", getpid());
+    /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+    printf("%d\n", mb_index.index);
+    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
+    master_index = pnodes_shm[0][2];
+    printf("%d resend\n", master_index);
+    for(i = 0; i < master_index; i++){
+        printf("%d master book page read\n", i);
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             temp = pmaster_book[i][j];
-            if(temp.receiver == getpid()) budget_temp = budget_temp + temp.amount;
-            if(temp.sender == getpid()) budget_temp = budget_temp - (temp.amount + temp.reward);
+            if(temp.receiver == getpid())
+                budget_temp = budget_temp + temp.amount;
+            if(temp.sender == getpid())
+                budget_temp = budget_temp - (temp.amount + temp.reward);
             for(k = 0; k < buffer_pre_book.list_index; k++){
                 if(temp.sender == getpid() && temp.amount == buffer_pre_book.list[k].amount && temp.receiver == buffer_pre_book.list[k].receiver){
                     for(l = k ; l < buffer_pre_book.list_index - 1; l++){
@@ -237,13 +231,13 @@ double budget_ev(){
             }
         }
     }
-    printf("post reading master book\n");
+    printf("user - %f calcolated without buffer\n", budget_temp);
     for(k = 0; k < buffer_pre_book.list_index; k++){
         budget_temp = budget_temp - (buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
     }
-    printf("post budget cal in budget ev\n");
+    printf("user - %f calcolated with buffer\n", budget_temp);
     sem_post(nodes_sem);
-    printf("post sem post in budget ev\n");
+    printf("user - after using master book\n");
     return budget_temp;
 }
 

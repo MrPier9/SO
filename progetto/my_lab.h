@@ -22,7 +22,6 @@
 #define NODES_PATH "./nodes"
 #define TRANSACTION_FIFO "trans_fifo"
 #define BILLION 1000000000L
-#define MAX 1024
 #define SO_REGISTRY_SIZE 100
 #define SO_BLOCK_SIZE 10
 
@@ -44,9 +43,9 @@ sem_t *nodes_sem;
 
 FILE *my_f;
 int users_shm_id;
-int (*puser_shm)[3];
+int (*puser_shm)[3];/*0 pid - 1 budget - 2 state*/
 int nodes_shm_id;
-int (*pnodes_shm)[2];
+int (*pnodes_shm)[3];/*0 pid - 1 budget - index master_book*/
 int master_book_id;
 transaction (*pmaster_book)[SO_REGISTRY_SIZE]/*[SO_BLOCK_SIZE]*/;
 transaction master_book_page[SO_BLOCK_SIZE];

@@ -23,6 +23,7 @@ int trans_counter = 0;
 time_t duration;
 struct timespec wait_next_trans;
 struct sigaction sa;
+int master_index;
 
 int msg_id;
 struct msg_buf{
@@ -99,8 +100,8 @@ int main(int argc, char *argv[]){
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR
-    mb_index_id = msgget(MSG_INDEX_KEY, 0666);
-    TEST_ERROR
+    /*mb_index_id = msgget(MSG_INDEX_KEY, 0666);
+    TEST_ERROR*/
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
     TEST_ERROR
 
@@ -124,6 +125,7 @@ int main(int argc, char *argv[]){
             read_trans();
             trans_counter++;
         }else if(tp_len == SO_BLOCK_SIZE-1){
+            sem_wait(nodes_sem);
             clock_gettime(CLOCK_REALTIME, &stop);
             tp_block[SO_BLOCK_SIZE-1].amount = my_reward;
             tp_block[SO_BLOCK_SIZE-1].receiver = getpid();
@@ -135,27 +137,30 @@ int main(int argc, char *argv[]){
             wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
             nanosleep(&wait_writing_mb, NULL);
 
+            /*printf("node %d- pre message rec\n", getpid());
             msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-            printf("message rec in node\n");
-            printf("pre wait node\n");
-            sem_wait(nodes_sem);
-            printf("post wait in node\n");
+            printf("node %d- index %d\n", getpid(), mb_index.index);*/
+
+
+            master_index = pnodes_shm[0][2];
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
-            printf("reading master book\n");
-                pmaster_book[mb_index.index][i] = tp_block[i];
+                printf("                node %d- writing in master book at %d\n", getpid(),master_index);
+                pmaster_book[master_index][i] = tp_block[i];
+                printf("%d, %f\n", pmaster_book[master_index][i].sender, pmaster_book[master_index][i].timestamp);
                 tp_block[i].reward = 0;
                 tp_block[i].amount = 0;
                 tp_block[i].sender = 0;
                 tp_block[i].timestamp = 0;
                 tp_block[i].receiver = 0;
             }
-            mb_index.index++;
-            printf("pre sending index\n");
-            msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-            printf("pre sem post node\n");
+            master_index++;
+            printf("node %d- %d sending index\n", getpid(),mb_index.index);
+            /*msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
+            for(i = 0; i < so_nodes_num; i++)
+                pnodes_shm[i][2] = master_index;
             sem_post(nodes_sem);
-            printf("post sem post in node\n");
 
+            printf("node %d- sended\n", getpid());
             tp_len = 0;
             my_reward = 0;
         }
@@ -171,10 +176,10 @@ int main(int argc, char *argv[]){
 }
 
 void read_trans(){
-    printf("pre trans rec\n");
+
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
-    printf("trans rec\n");
     TEST_ERROR
+
     my_transaction = transaction_rec.message;
     my_reward = my_reward + my_transaction.reward;
     total_reward = total_reward + my_transaction.reward;

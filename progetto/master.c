@@ -27,6 +27,7 @@ int msg_id;
 int mb_index_id;
 int msg_budget_id;
 struct timespec start, stop;
+int j;
 
 struct msg_buf_mb{
     long msg_type;
@@ -78,8 +79,8 @@ int main(){
     nodes_sem_set(1);
     shm_user_set();
     shm_nodes_set();
-    mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);
-    TEST_ERROR
+    /*mb_index_id = msgget(MSG_INDEX_KEY, 0666 | IPC_CREAT | IPC_EXCL);
+    TEST_ERROR*/
     msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR;
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
@@ -114,16 +115,19 @@ int main(){
     }
     for (i = 0; i < so_nodes_num; i++){
         pnodes_shm[i][1] = 0;
+        pnodes_shm[i][2] = 0;
     }
     sem_post(nodes_sem);
 
     do{
-        printf("pre wait\n");
+        printf("master - pre sem wait\n");
         sem_wait(nodes_sem);
-        printf("post wait\n");
-        msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-        msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-        printf("index read\n");
+        printf("master - pre rec\n");
+        /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+        printf("master - after rec\n");
+        msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
+        master_index = pnodes_shm[0][2];
+        printf("master - %d index read\n", mb_index.index);
         for (i = 0; i < so_users_num; i++){
             puser_shm[i][1] = read_budget(puser_shm[i][0], 0);
             if(puser_shm[i][2] == 0) {
@@ -181,9 +185,24 @@ int main(){
     for (i = 0; i < so_nodes_num; i++){
         printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
     }
-    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-    printf("number of blocks in master book - %d\n", mb_index.index);
+    /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);*/
+    master_index = pnodes_shm[0][2];
+    printf("\nnumber of blocks in master book - %d\n", mb_index.index);
     printf("\n");
+
+    for(i = 0; i < master_index; i++){
+        printf("[%d][%d]\n", i, j);
+        for(j = 0; j < SO_BLOCK_SIZE; j++){
+            printf("--------------------------------------------\n");
+                printf("    timestamp: %f",  (double)pmaster_book[i][j].timestamp);
+                printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+                printf("    sent to: %d\n", pmaster_book[i][j].receiver);
+                printf("    sent by: %d", pmaster_book[i][j].sender);
+                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        pmaster_book[i][j].amount, pmaster_book[i][j].reward);
+                printf("--------------------------------------------\n");
+        }
+    }
 
     user_sem_del();
     nodes_sem_del();
@@ -196,9 +215,9 @@ int main(){
     msgctl(mb_index_id, IPC_RMID,NULL);
     msgctl(msg_id, IPC_RMID, NULL);
     msgctl(msg_budget_id, IPC_RMID, NULL);
-    if(user_done == so_users_num) printf("\n\n\nending simulation due to user\n\n\n");
+    if(user_done >= so_users_num-1) printf("\n\n\nending simulation due to user\n\n\n");
     else if(master_index == SO_REGISTRY_SIZE) printf("\n\n\nending simulation due to master book full\n\n\n");
-    else printf("\n\n\nending simulation due to time\n\n\n");
+    else printf("\n\n\nending simulation due to time %d\n\n\n", duration);
 
     return 0;
 }
@@ -272,10 +291,10 @@ int read_budget(int pid, int type){
     int i, j, pid_budget;
     if(type == 0)  pid_budget = so_budget_init;
     else pid_budget = 0;
-
-    msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);
-    master_index = mb_index.index;
+    printf("master - pre master book \n");
+    /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
+    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
+    master_index = pnodes_shm[0][2];
     for(i = 0; i < master_index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
             if(pmaster_book[i][j].receiver == pid){
@@ -286,60 +305,10 @@ int read_budget(int pid, int type){
             }
         }
     }
-
+    printf("master - after master book\n");
     return pid_budget;
 }
 
-
-void handle_sigint(int signal){
-    int i;
-    switch (signal){
-    case SIGINT:
-        for (i = 0; i < so_users_num; i++){
-            kill(puser_shm[i][0], SIGINT);
-        }
-        for (i = 0; i < so_nodes_num; i++){
-            kill(pnodes_shm[i][0], SIGINT);
-        }
-
-        while(waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
-            if (errno == ECHILD) {
-                break;
-            }
-        }
-
-        printf("\n\nat ending simulation\n");
-        for (i = 0; i < so_users_num; i++){
-            if(puser_shm[i][2] == 0) {
-                printf("user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
-            }else{
-                printf("user %d already terminated with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
-                }
-            }
-            for (i = 0; i < so_nodes_num; i++){
-                printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
-            }
-            printf("\n");
-
-            user_sem_del();
-            nodes_sem_del();
-            shmdt(puser_shm);
-            shmctl(users_shm_id, IPC_RMID, NULL);
-            shmdt(pnodes_shm);
-            shmdt(pmaster_book);
-            shmctl(nodes_shm_id, IPC_RMID, NULL);
-            shmctl(master_book_id, IPC_RMID, NULL);
-            msgctl(msg_id, IPC_RMID, NULL);
-            msgctl(mb_index_id, IPC_RMID,NULL);
-            msgctl(msg_budget_id, IPC_RMID, NULL);
-        printf("\n\n\nforced ending simulation...\n\n\n");
-        sleep(1);
-
-        exit(0);
-    default:
-        exit(EXIT_FAILURE);
-    }
-}
 void handle_user_term(int signal, siginfo_t *si, void *data){
     int i;
 
@@ -370,6 +339,20 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
                 printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
             }
             printf("\n");
+
+            for(i = 0; i < master_index; i++){
+                printf("[%d]\n", i);
+                for(j = 0; j < SO_BLOCK_SIZE; j++){
+                    printf("--------------------------------------------\n");
+                    printf("    timestamp: %f",  (double)pmaster_book[i][j].timestamp);
+                    printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+                    printf("    sent to: %d\n", pmaster_book[i][j].receiver);
+                    printf("    sent by: %d", pmaster_book[i][j].sender);
+                    printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+                        pmaster_book[i][j].amount, pmaster_book[i][j].reward);
+                    printf("--------------------------------------------\n");
+                }
+            }
 
             user_sem_del();
             nodes_sem_del();

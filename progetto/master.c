@@ -329,7 +329,6 @@ void handle_sigint(int signal){
             msgctl(msg_id, IPC_RMID, NULL);
             msgctl(mb_index_id, IPC_RMID,NULL);
             msgctl(msg_budget_id, IPC_RMID, NULL);
-
         printf("\n\n\nforced ending simulation...\n\n\n");
         sleep(1);
 

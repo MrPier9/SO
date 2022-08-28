@@ -35,6 +35,8 @@ struct msg_buf_budget{
     int pid;
 } budget_buf;
 
+struct timespec random_number;
+
 /*
  * It makes and call user processes
  */
@@ -65,6 +67,7 @@ int main(){
     sa_user.sa_sigaction = &handle_user_term;
     sigaction(SIGUSR2, &sa_user, 0);
     sigaction(SIGINT, &sa_user, NULL);
+    sigaction(SIGTSTP, &sa_user, NULL);
 
     load_file();
     test_load_file();
@@ -355,6 +358,15 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
                 }
             }
             user_done++;
+            break;
+
+        case SIGTSTP:
+
+            clock_gettime(CLOCK_REALTIME, &random_number);
+            srand(time(NULL));
+            j = puser_shm[rand()%so_users_num][0];
+            kill(j, SIGUSR2);
+            printf("%d about to make transaction\n", j);
             break;
         default:
             exit(EXIT_FAILURE);

@@ -120,7 +120,7 @@ int main(int argc, char *argv[]){
 
             wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
             nanosleep(&wait_writing_mb, NULL);
-            /*printf("\n                      node %d writing at %f\n\n", getpid(), tp_block[SO_BLOCK_SIZE-1].timestamp);*/
+
             master_index = pnodes_shm[0][2];
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
                 pmaster_book[master_index][i] = tp_block[i];
@@ -135,7 +135,6 @@ int main(int argc, char *argv[]){
             for(i = 0; i < so_nodes_num; i++)
                 pnodes_shm[i][2] = master_index;
 
-            /*printf("                        reward write %.2f - budget %.2f", my_reward, total_reward);*/
             sem_post(nodes_sem);
 
             tp_len = 0;
@@ -168,8 +167,8 @@ void handle_sig(int signal)
     switch (signal){
     case SIGINT:
 
-        printf("\n\nnode %d\n", getpid());
-        printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
+        printf("\n\nnode %d - transactions elaborated %d - transaction still in transaction pool %d\n",
+               getpid(),trans_counter, tp_len);
 
         sem_close(nodes_sem);
         sem_close(user_sem);

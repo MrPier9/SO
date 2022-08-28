@@ -88,7 +88,7 @@ int main(int argc, char *argv[]){
     pnodes_shm = shmat(nodes_shm_id, NULL, 0);
     TEST_ERROR
 
-    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, 0666);
+    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_BLOCK_SIZE, 0666);
     TEST_ERROR
     pmaster_book = shmat(master_book_id, NULL, 0);
     TEST_ERROR

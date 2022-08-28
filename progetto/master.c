@@ -86,7 +86,7 @@ int main(){
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR
 
-    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_REGISTRY_SIZE, IPC_CREAT | 0666);
+    master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_BLOCK_SIZE, IPC_CREAT | 0666);
     TEST_ERROR;
     pmaster_book = shmat(master_book_id, NULL, 0);
     TEST_ERROR;
@@ -187,7 +187,7 @@ int main(){
     }
     /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);*/
     master_index = pnodes_shm[0][2];
-    printf("\nnumber of blocks in master book - %d\n", mb_index.index);
+    printf("\nnumber of blocks in master book - %d\n", master_index);
     printf("\n");
 
     for(i = 0; i < master_index; i++){

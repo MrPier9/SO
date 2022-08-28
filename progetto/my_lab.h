@@ -47,8 +47,8 @@ int (*puser_shm)[3];/*0 pid - 1 budget - 2 state*/
 int nodes_shm_id;
 int (*pnodes_shm)[3];/*0 pid - 1 budget - index master_book*/
 int master_book_id;
-transaction (*pmaster_book)[SO_REGISTRY_SIZE]/*[SO_BLOCK_SIZE]*/;
-transaction master_book_page[SO_BLOCK_SIZE];
+transaction (*pmaster_book)[SO_BLOCK_SIZE]/*[SO_BLOCK_SIZE]*/;
+transaction master_book_page[SO_REGISTRY_SIZE];
 
 int so_users_num;
 int so_nodes_num;

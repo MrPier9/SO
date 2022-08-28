@@ -120,6 +120,8 @@ int main(){
             puser_shm[i][1] = read_budget(puser_shm[i][0], 0);
             if(puser_shm[i][2] == 0) {
                 printf("working user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
+            }else{
+                printf("terminated user %d with budget %d\n", (int) puser_shm[i][0], puser_shm[i][1]);
             }
         }
         for (i = 0; i < so_nodes_num; i++){

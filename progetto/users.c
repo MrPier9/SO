@@ -5,15 +5,12 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
 #include <sys/shm.h>
-#include <sys/wait.h>
 #include <sys/msg.h>
-#include <limits.h>
 #include "my_lab.h"
 
 int transaction_tot; /*cifra totale transazione*/
@@ -258,11 +255,17 @@ double budget_ev(){
 void handle_sig(int signal){
     switch (signal) {
         case SIGINT:
+            printf("1\n");
             sem_close(nodes_sem);
+            printf("2\n");
             sem_close(user_sem);
+            printf("3\n");
             shmdt(puser_shm);
+            printf("4\n");
             shmdt(pnodes_shm);
+            printf("5\n");
             shmdt(pmaster_book);
+            printf("6\n");
             exit(0);
 
         case SIGUSR1:

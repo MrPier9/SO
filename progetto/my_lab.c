@@ -1,19 +1,12 @@
 #define _GNU_SOURCE_
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <semaphore.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
-#include <signal.h>
 #include <sys/shm.h>
-#include <sys/mman.h>
-#include <sys/wait.h>
-#include <limits.h>
 #include "my_lab.h"
 
 void user_sem_set(int sem_value){

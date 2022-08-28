@@ -7,12 +7,10 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <time.h>
 #include <signal.h>
 #include <sys/shm.h>
 #include <sys/wait.h>
-#include <limits.h>
 #include <sys/msg.h>
 #include "my_lab.h"
 
@@ -21,8 +19,6 @@ struct sigaction sa;
 struct sigaction sa_user;
 int user_done = 0;
 int master_index = 0;
-/*int (*user_arr)[3];
-int (*nodes_arr)[2];*/
 int msg_id;
 int mb_index_id;
 int msg_budget_id;
@@ -63,6 +59,7 @@ int read_budget(int, int);
 
 int main(){
     int i, duration;
+    FILE *fp;
 
     sa_user.sa_flags = SA_SIGINFO;
     sa_user.sa_sigaction = &handle_user_term;
@@ -77,14 +74,14 @@ int main(){
     shm_nodes_set();
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
-    TEST_ERROR;
+    TEST_ERROR
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR
 
     master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_BLOCK_SIZE, IPC_CREAT | 0666);
-    TEST_ERROR;
+    TEST_ERROR
     pmaster_book = shmat(master_book_id, NULL, 0);
-    TEST_ERROR;
+    TEST_ERROR
 
 
     mb_index.msg_type = 1;
@@ -97,7 +94,6 @@ int main(){
     make_nodes();
     make_users();
 
-    /*TEST_ERROR;*/
     sleep(1);
 
     sem_wait(nodes_sem);
@@ -140,9 +136,11 @@ int main(){
         if(puser_shm[i][2] == 0)
             kill(puser_shm[i][0], SIGINT);
     }
+
     for (i = 0; i < so_nodes_num; i++){
         kill(pnodes_shm[i][0], SIGINT);
     }
+
     while(waitpid(-1, NULL, 0)) { /*master aspetta per ogni user di finire*/
         if (errno == ECHILD) {
             break;
@@ -169,20 +167,22 @@ int main(){
     printf("\nnumber of blocks in master book - %d\n", master_index);
     printf("\n");
 
+    fp = fopen("./master_book.txt", "w");
     for(i = 0; i < master_index; i++){
-        printf("[%d][%d]\n", i, j);
+        fprintf(fp,"[%d][%d]\n", i, j);
         for(j = 0; j < SO_BLOCK_SIZE; j++){
-            printf("--------------------------------------------\n");
-                printf("    timestamp: %f",  (double)pmaster_book[i][j].timestamp);
-                printf("    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
-                printf("    sent to: %d\n", pmaster_book[i][j].receiver);
-                printf("    sent by: %d", pmaster_book[i][j].sender);
-                printf("    transaction amount: %.2f\n    reward: %.2f\n", \
+            fprintf(fp,"--------------------------------------------\n");
+                fprintf(fp,"    timestamp: %f",  (double)pmaster_book[i][j].timestamp);
+                fprintf(fp,"    transaction sent: %.2f\n", pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+                fprintf(fp,"    sent to: %d\n", pmaster_book[i][j].receiver);
+                fprintf(fp,"    sent by: %d", pmaster_book[i][j].sender);
+                fprintf(fp,"    transaction amount: %.2f\n    reward: %.2f\n", \
                         pmaster_book[i][j].amount, pmaster_book[i][j].reward);
-                printf("--------------------------------------------\n");
+                fprintf(fp,"--------------------------------------------\n");
         }
     }
 
+    fclose(fp);
     user_sem_del();
     nodes_sem_del();
     shmdt(puser_shm);

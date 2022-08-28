@@ -5,15 +5,12 @@
 #include <semaphore.h>
 #include <errno.h>
 #include <string.h>
-#include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
 #include <signal.h>
 #include <sys/shm.h>
-#include <sys/wait.h>
 #include <sys/msg.h>
-#include <limits.h>
 #include "my_lab.h"
 
 transaction my_transaction;
@@ -171,22 +168,8 @@ void handle_sig(int signal)
     switch (signal){
     case SIGINT:
 
-        sem_wait(nodes_sem);
         printf("\n\nnode %d\n", getpid());
         printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
-        printf("--------------------------------------------\n");
-        for(i = 0; i < tp_len; i++){/* could be til tp_len, to try | SO_BLOCK_SIZE */
-            printf("    timestamp: %f",  (double)tp_block[i].timestamp);
-            printf("    transaction sent: %.2f\n", tp_block[i].amount + tp_block[i].reward);
-            printf("    sent to: %d\n", tp_block[i].receiver);
-            printf("    sent by: %d", tp_block[i].sender);
-            printf("    transaction amount: %.2f\n    reward: %.2f\n", \
-                        tp_block[i].amount, tp_block[i].reward);
-            printf("--------------------------------------------\n");
-        }
-        /*printf("block here 1\n");*/
-        sem_post(nodes_sem);
-        /*printf("block here 2\n");*/
 
         sem_close(nodes_sem);
         sem_close(user_sem);

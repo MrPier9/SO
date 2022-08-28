@@ -181,20 +181,16 @@ int transaction_data(){
     }while (n == getpid() || puser_shm[n][2] == 1);
 
     my_transaction.receiver = puser_shm[n][0];
-
     clock_gettime(CLOCK_REALTIME, &stop);
     TEST_ERROR;
     my_transaction.timestamp = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     my_transaction.sender = getpid();
-
     node_pid = pnodes_shm[rand() % so_nodes_num][0];
-
     transaction_to_send.msg_type = node_pid;
     transaction_to_send.message = my_transaction;
-    printf("user - sending trans\n");
+
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
     TEST_ERROR
-    printf("user - trans sent\n");
     buffer_pre_book.list[buffer_pre_book.list_index] = my_transaction;
     buffer_pre_book.list_index++;
 
@@ -205,21 +201,18 @@ double budget_ev(){
     int j, k, l;
     transaction temp;
     double budget_temp = so_budget_init;
+
     sem_wait(nodes_sem);
-    printf("user %d - preusing masterbook\n", getpid());
-    /*msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-    printf("%d\n", mb_index.index);
-    msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
     master_index = pnodes_shm[0][2];
-    printf("%d resend\n", master_index);
     for(i = 0; i < master_index; i++){
-        printf("%d master book page read\n", i);
         for(j = 0; j < SO_BLOCK_SIZE; j++) {
+
             temp = pmaster_book[i][j];
             if(temp.receiver == getpid())
                 budget_temp = budget_temp + temp.amount;
             if(temp.sender == getpid())
                 budget_temp = budget_temp - (temp.amount + temp.reward);
+
             for(k = 0; k < buffer_pre_book.list_index; k++){
                 if(temp.sender == getpid() && temp.amount == buffer_pre_book.list[k].amount && temp.receiver == buffer_pre_book.list[k].receiver){
                     for(l = k ; l < buffer_pre_book.list_index - 1; l++){
@@ -231,13 +224,12 @@ double budget_ev(){
             }
         }
     }
-    printf("user - %f calcolated without buffer\n", budget_temp);
+
     for(k = 0; k < buffer_pre_book.list_index; k++){
         budget_temp = budget_temp - (buffer_pre_book.list[k].amount + buffer_pre_book.list[k].reward);
     }
-    printf("user - %f calcolated with buffer\n", budget_temp);
     sem_post(nodes_sem);
-    printf("user - after using master book\n");
+
     return budget_temp;
 }
 

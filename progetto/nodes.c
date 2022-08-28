@@ -154,13 +154,11 @@ int main(int argc, char *argv[]){
                 tp_block[i].receiver = 0;
             }
             master_index++;
-            printf("node %d- %d sending index\n", getpid(),mb_index.index);
-            /*msgsnd(mb_index_id, &mb_index , sizeof(mb_index), 0);*/
+
             for(i = 0; i < so_nodes_num; i++)
                 pnodes_shm[i][2] = master_index;
             sem_post(nodes_sem);
 
-            printf("node %d- sended\n", getpid());
             tp_len = 0;
             my_reward = 0;
         }

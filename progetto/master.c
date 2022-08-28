@@ -112,7 +112,6 @@ int main(){
     sem_post(nodes_sem);
 
     do{
-
         sem_wait(nodes_sem);
         master_index = pnodes_shm[0][2];
 
@@ -134,11 +133,12 @@ int main(){
         sleep(1);
         clock_gettime(CLOCK_REALTIME, &stop);
         duration = ((stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION);
-        printf("\n\nduration %d\n\n", duration);
+        /*printf("\n\nduration %d\n\n", duration);*/
     } while (duration < so_sim_sec && user_done < so_users_num-1 && master_index < SO_REGISTRY_SIZE);
 
     for (i = 0; i < so_users_num; i++){
-        kill(puser_shm[i][0], SIGINT);
+        if(puser_shm[i][2] == 0)
+            kill(puser_shm[i][0], SIGINT);
     }
     for (i = 0; i < so_nodes_num; i++){
         kill(pnodes_shm[i][0], SIGINT);
@@ -150,6 +150,7 @@ int main(){
     }
 
     printf("\n\n        at ending simulation\n");
+    sem_wait(user_sem);
     for (i = 0; i < so_users_num; i++){
         puser_shm[i][1] = read_budget(puser_shm[i][0], 0);
         if(puser_shm[i][2] == 0) {
@@ -162,6 +163,7 @@ int main(){
         puser_shm[i][1] = read_budget(puser_shm[i][0], 1);
         printf("nodes %d with budget %d\n", pnodes_shm[i][0], pnodes_shm[i][1]);
     }
+    sem_post(user_sem);
 
     master_index = pnodes_shm[0][2];
     printf("\nnumber of blocks in master book - %d\n", master_index);
@@ -269,14 +271,14 @@ int read_budget(int pid, int type){
     if(type == 0)  pid_budget = so_budget_init;
     else pid_budget = 0;
 
-    master_index = pnodes_shm[0][2];
     for(i = 0; i < master_index; i++){
-        for(j = 0; j < SO_BLOCK_SIZE; j++) {
+        for(j = 0; j < SO_BLOCK_SIZE; j++){
             if(pmaster_book[i][j].receiver == pid){
-                pid_budget = pmaster_book[i][j].amount + pid_budget;
-            }
-            if(pmaster_book[i][j].sender == pid){
+                pid_budget = pid_budget + pmaster_book[i][j].amount;
+                /*printf("%d receiver + %d\n", pmaster_book[i][j].receiver, pid_budget);*/
+            }else if(pmaster_book[i][j].sender == pid){
                 pid_budget =  pid_budget - (pmaster_book[i][j].amount + pmaster_book[i][j].reward);
+                /*printf("%d sender - %d\n", pmaster_book[i][j].receiver, pid_budget);*/
             }
         }
     }

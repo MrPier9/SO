@@ -100,24 +100,11 @@ int main(int argc, char *argv[]){
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR
-    /*mb_index_id = msgget(MSG_INDEX_KEY, 0666);
-    TEST_ERROR*/
+
     msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
     TEST_ERROR
 
     wait_writing_mb.tv_sec = 0;
-
-    /*list_user = malloc(sizeof(int)*so_users_num);
-    list_nodes = malloc(sizeof(int) * so_nodes_num);
-
-    for(i = 0; i < so_users_num; i++){
-        list_user[i] = puser_shm[i];
-    }
-    for(i = 0; i < so_nodes_num; i++){
-        list_nodes[i] = pnodes_shm[i];
-    }
-    shmdt(puser_shm);
-    shmdt(pnodes_shm);*/
 
     while (trans_counter < so_tp_size){
 
@@ -136,17 +123,10 @@ int main(int argc, char *argv[]){
 
             wait_writing_mb.tv_nsec = set_wait(so_max_trans_proc_nsec,so_min_trans_proc_nsec);
             nanosleep(&wait_writing_mb, NULL);
-
-            /*printf("node %d- pre message rec\n", getpid());
-            msgrcv(mb_index_id, &mb_index, sizeof(mb_index), 1, 0);
-            printf("node %d- index %d\n", getpid(), mb_index.index);*/
-
-
+            /*printf("\n                      node %d writing at %f\n\n", getpid(), tp_block[SO_BLOCK_SIZE-1].timestamp);*/
             master_index = pnodes_shm[0][2];
             for(i = 0; i < SO_BLOCK_SIZE; i++) {
-                printf("                node %d- writing in master book at %d\n", getpid(),master_index);
                 pmaster_book[master_index][i] = tp_block[i];
-                printf("%d, %f\n", pmaster_book[master_index][i].sender, pmaster_book[master_index][i].timestamp);
                 tp_block[i].reward = 0;
                 tp_block[i].amount = 0;
                 tp_block[i].sender = 0;
@@ -157,6 +137,8 @@ int main(int argc, char *argv[]){
 
             for(i = 0; i < so_nodes_num; i++)
                 pnodes_shm[i][2] = master_index;
+
+            /*printf("                        reward write %.2f - budget %.2f", my_reward, total_reward);*/
             sem_post(nodes_sem);
 
             tp_len = 0;
@@ -174,7 +156,6 @@ int main(int argc, char *argv[]){
 }
 
 void read_trans(){
-
     msgrcv(msg_id, &transaction_rec, sizeof(transaction_rec), getpid(), 0);
     TEST_ERROR
 
@@ -182,8 +163,6 @@ void read_trans(){
     my_reward = my_reward + my_transaction.reward;
     total_reward = total_reward + my_transaction.reward;
     tp_block[tp_len] = my_transaction;
-    wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec,so_min_trans_gen_nsec);
-    nanosleep(&wait_next_trans, NULL);
     tp_len++;
 }
 
@@ -192,7 +171,7 @@ void handle_sig(int signal)
     switch (signal){
     case SIGINT:
 
-        sem_wait(user_sem);
+        sem_wait(nodes_sem);
         printf("\n\nnode %d\n", getpid());
         printf("transactions elaborated %d - transaction still in transaction pool %d\n", trans_counter, tp_len);
         printf("--------------------------------------------\n");
@@ -205,9 +184,10 @@ void handle_sig(int signal)
                         tp_block[i].amount, tp_block[i].reward);
             printf("--------------------------------------------\n");
         }
-        sem_post(user_sem);
+        /*printf("block here 1\n");*/
+        sem_post(nodes_sem);
+        /*printf("block here 2\n");*/
 
-        close(trans_fd);
         sem_close(nodes_sem);
         sem_close(user_sem);
         shmdt(puser_shm);

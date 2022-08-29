@@ -111,10 +111,6 @@ int main(int argc, char *argv[]){
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR;
-    /*mb_index_id = msgget(MSG_INDEX_KEY, 0666);
-    TEST_ERROR*/
-    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
-    TEST_ERROR
 
     wait_next_trans.tv_sec = 0;
     budget = so_budget_init;
@@ -122,8 +118,7 @@ int main(int argc, char *argv[]){
 
     while (try < so_retry){
         n = transaction_data();
-        /*printf("%d - trans made %.2f - receiver %d at time %f - budget %.2f\n", getpid(), my_transaction.amount + my_transaction.reward,
-               my_transaction.receiver, my_transaction.timestamp, budget);*/
+
         try = try + n;
         tot_trans++;
         wait_next_trans.tv_nsec = set_wait(so_max_trans_gen_nsec, so_min_trans_gen_nsec);
@@ -131,12 +126,7 @@ int main(int argc, char *argv[]){
     }
 
     kill(getppid(), SIGUSR2);
-    /*for(i = 0; i < buffer_pre_book.list_index; i++){
-        printf("%d - trans still in buf %.2f - receiver %d\n", getpid(),buffer_pre_book.list[i].amount + buffer_pre_book.list[i].reward,
-               buffer_pre_book.list[i].receiver);
-    }*/
 
-    /*printf("\ntot transaction made by %d - %d - budget%.2f\n", getpid(), tot_trans + 1, budget);*/
     sem_close(nodes_sem);
     sem_close(user_sem);
     shmdt(puser_shm);
@@ -199,7 +189,6 @@ int transaction_data(){
 
     my_transaction.receiver = puser_shm[n][0];
     clock_gettime(CLOCK_REALTIME, &stop);
-    TEST_ERROR;
     my_transaction.timestamp = (stop.tv_sec - start.tv_sec) + (double)(stop.tv_nsec - start.tv_nsec) / (double)BILLION;
     my_transaction.sender = getpid();
     node_pid = pnodes_shm[rand() % so_nodes_num][0];
@@ -207,7 +196,6 @@ int transaction_data(){
     transaction_to_send.message = my_transaction;
 
     msgsnd(msg_id, &transaction_to_send, sizeof(transaction_to_send), 0);
-    TEST_ERROR
     buffer_pre_book.list[buffer_pre_book.list_index] = my_transaction;
     buffer_pre_book.list_index++;
 
@@ -220,6 +208,8 @@ double budget_ev(){
     double budget_temp = so_budget_init;
 
     sem_wait(nodes_sem);
+    if(errno == EINTR) { }
+
     master_index = pnodes_shm[0][2];
     for(i = 0; i < master_index; i++){
         for(j = 0; j < SO_BLOCK_SIZE; j++) {

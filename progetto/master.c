@@ -67,7 +67,6 @@ int main(){
     sa_user.sa_sigaction = &handle_user_term;
     sigaction(SIGUSR2, &sa_user, 0);
     sigaction(SIGINT, &sa_user, NULL);
-    sigaction(SIGTSTP, &sa_user, NULL);
 
     load_file();
     test_load_file();
@@ -77,8 +76,6 @@ int main(){
     shm_nodes_set();
 
     msg_id = msgget(MSG_QUEUE_KEY, 0666 | IPC_CREAT | IPC_EXCL);
-    TEST_ERROR
-    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666 | IPC_CREAT | IPC_EXCL);
     TEST_ERROR
 
     master_book_id = shmget(MASTER_BOOK_KEY, sizeof(master_book_page) * SO_BLOCK_SIZE, IPC_CREAT | 0666);
@@ -196,7 +193,7 @@ int main(){
     shmctl(master_book_id, IPC_RMID, NULL);
     msgctl(mb_index_id, IPC_RMID,NULL);
     msgctl(msg_id, IPC_RMID, NULL);
-    msgctl(msg_budget_id, IPC_RMID, NULL);
+
     if(user_done >= so_users_num-1) printf("\n\n\nending simulation due to user\n\n\n");
     else if(master_index == SO_REGISTRY_SIZE) printf("\n\n\nending simulation due to master book full\n\n\n");
     else printf("\n\n\nending simulation due to time %d\n\n\n", duration);
@@ -219,8 +216,6 @@ void make_users(){
     args_user[1] = str_start_s;
     args_user[2] = str_start_n;
 
-    /*free(str_budget_init);
-    free(str_reward);*/
 
     for (i = 0; i < so_users_num; i++){
         pid = fork();
@@ -278,10 +273,8 @@ int read_budget(int pid, int type){
         for(j = 0; j < SO_BLOCK_SIZE; j++){
             if(pmaster_book[i][j].receiver == pid){
                 pid_budget = pid_budget + pmaster_book[i][j].amount;
-                /*printf("%d receiver + %d\n", pmaster_book[i][j].receiver, pid_budget);*/
             }else if(pmaster_book[i][j].sender == pid){
                 pid_budget =  pid_budget - (pmaster_book[i][j].amount + pmaster_book[i][j].reward);
-                /*printf("%d sender - %d\n", pmaster_book[i][j].receiver, pid_budget);*/
             }
         }
     }
@@ -344,7 +337,7 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
             shmctl(master_book_id, IPC_RMID, NULL);
             msgctl(msg_id, IPC_RMID, NULL);
             msgctl(mb_index_id, IPC_RMID, NULL);
-            msgctl(msg_budget_id, IPC_RMID, NULL);
+
             printf("\n\n\nforced ending simulation...\n\n\n");
             sleep(1);
 
@@ -360,14 +353,6 @@ void handle_user_term(int signal, siginfo_t *si, void *data){
             user_done++;
             break;
 
-        case SIGTSTP:
-
-            clock_gettime(CLOCK_REALTIME, &random_number);
-            srand(time(NULL));
-            j = puser_shm[rand()%so_users_num][0];
-            kill(j, SIGUSR2);
-            printf("%d about to make transaction\n", j);
-            break;
         default:
             exit(EXIT_FAILURE);
     }

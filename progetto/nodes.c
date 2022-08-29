@@ -98,13 +98,9 @@ int main(int argc, char *argv[]){
     msg_id = msgget(MSG_QUEUE_KEY, 0666);
     TEST_ERROR
 
-    msg_budget_id = msgget(MSG_BUDGET_KEY, 0666);
-    TEST_ERROR
-
     wait_writing_mb.tv_sec = 0;
 
     while (trans_counter < so_tp_size){
-
         if(tp_len < SO_BLOCK_SIZE-1){
             read_trans();
             trans_counter++;
